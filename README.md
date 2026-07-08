@@ -11,11 +11,15 @@ It's static JS with **no build system**: serve the directory and open it in a br
 ## Status
 
 - ✅ Forked from Lexy's Labyrinth upstream (2026-07-06), engine runs unmodified.
-- ✅ Rebranded visible title to *Jarvis's Junction* (`index.html`).
+- ✅ Rebranded to *Jarvis's Junction* + butler-theme splash/pack copy (`index.html`,
+  `js/main.js` `BUILTIN_PACKS`).
 - ✅ Removed `tileset-tworld.png` (the vendored Tile World tileset — unused by the app
   and belongs to its owners).
-- ⏳ Deeper reskin (own icon/sprites/name inside the engine + editor) — not yet done.
-- ⏳ Deploy wiring (`.jarvis.json`, Launcher/Dashboard registry, subdomain) — not yet done.
+- ✅ **Live**: GitHub Pages at https://jarvis-junction.dabrewer.dev/ (prod) and
+  `/dev/` (dev); registered in the Launcher + Dashboard; idea-log card at *Building*.
+- ✅ v1 scope agreed — see [`DESIGN.md`](DESIGN.md).
+- ⏳ Next (per DESIGN.md): diegetic butler UI + game-feel juice, accessibility,
+  progression, then the manor-hub campaign. Original tileset art + servers are later.
 
 ## Run locally
 
