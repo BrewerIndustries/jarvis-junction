@@ -21,6 +21,9 @@ import { EffectsLayer, screen_shake, haptic } from './juice.js';
 // holding one direction then pressing another moves in the newer one, and
 // releasing it falls back to whatever direction is still held.
 const DIRECTIONAL_ACTIONS = new Set(['up', 'down', 'left', 'right']);
+// A tapped direction is remembered for a few tics so a press made slightly before
+// the game is ready to accept it isn't dropped (input buffering / move leniency).
+const INPUT_BUFFER_TICS = 4;
 import * as util from './util.js';
 
 const PAGE_TITLE = "Jarvis's Junction";
@@ -764,6 +767,8 @@ class Player extends PrimaryView {
         this.pending_player_move = null;
         this.next_player_move = null;
         this.player_used_move = false;
+        this._buffered_dir = null;   // a recently tapped direction awaiting a decision tic
+        this._buffer_ttl = 0;        // tics that buffered direction stays valid
         let key_target = document.body;
         this.current_keycodes = new Set;  // keys that are currently held
         this.current_keycodes_new = new Set; // keys that were pressed since input was last read
@@ -870,6 +875,14 @@ class Player extends PrimaryView {
                 this.current_keycodes_new.add(ev.code);
                 ev.stopPropagation();
                 ev.preventDefault();
+
+                // Buffer a tapped direction so a press made just before the game can
+                // accept it isn't lost (consumed at the next decision tic in get_input).
+                let action = this.keycode_mapping[ev.code];
+                if (DIRECTIONAL_ACTIONS.has(action)) {
+                    this._buffered_dir = action;
+                    this._buffer_ttl = INPUT_BUFFER_TICS;
+                }
 
                 // TODO for demo compat, this should happen as part of input reading?
                 if (this.state === 'waiting') {
@@ -1552,6 +1565,8 @@ class Player extends PrimaryView {
     enter_background() {
         this.stop_restarting();
         this.current_keycodes.clear();
+        this._buffered_dir = null;
+        this._buffer_ttl = 0;
         this.current_touches = {};
 
         if ((this.state === 'playing' || this.state === 'rewinding') && ! this.turn_based_mode) {
@@ -1922,6 +1937,32 @@ class Player extends PrimaryView {
         this.current_keycodes_new.clear();
         // A brand-new press this read wins; otherwise the newest still-held one.
         let active_dir = new_dir ?? held_dir;
+
+        // Input buffering / move leniency: if nothing is held or freshly pressed but
+        // a direction was tapped within the last few tics, hold it until the game can
+        // actually accept a move, then consume it once (so a press made a hair early
+        // still registers, without ever double-moving). Real held input always wins.
+        if (active_dir === null) {
+            if (this._buffer_ttl > 0 && this._buffered_dir !== null &&
+                this.level && this.level.can_accept_input && this.level.can_accept_input())
+            {
+                active_dir = this._buffered_dir;
+                this._buffered_dir = null;
+                this._buffer_ttl = 0;
+            }
+        }
+        else {
+            // A real key is down; drop any stale buffered tap.
+            this._buffered_dir = null;
+            this._buffer_ttl = 0;
+        }
+        if (this._buffer_ttl > 0) {
+            this._buffer_ttl -= 1;
+            if (this._buffer_ttl === 0) {
+                this._buffered_dir = null;
+            }
+        }
+
         if (active_dir !== null) {
             input |= INPUT_BITS[active_dir];
         }
