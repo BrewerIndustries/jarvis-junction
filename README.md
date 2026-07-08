@@ -18,8 +18,17 @@ It's static JS with **no build system**: serve the directory and open it in a br
 - ✅ **Live**: GitHub Pages at https://jarvis-junction.dabrewer.dev/ (prod) and
   `/dev/` (dev); registered in the Launcher + Dashboard; idea-log card at *Building*.
 - ✅ v1 scope agreed — see [`DESIGN.md`](DESIGN.md).
-- ⏳ Next (per DESIGN.md): diegetic butler UI + game-feel juice, accessibility,
-  progression, then the manor-hub campaign. Original tileset art + servers are later.
+- ✅ **Diegetic butler theme**: warm brass/manor palette + serif type, "Master's
+  note" splash, rebranded packs ("inspired by Chip's Challenge"), in-game pack-name
+  override, butler UI labels (begin duty / duty roster / gratuity), and butler
+  death/win messages.
+- ✅ **Game-feel juice** (`js/juice.js`): pickup particles, socket/bomb/death
+  screen-shake, "duty complete" confetti, mobile haptics — all off the sfx event
+  hook, honoring `prefers-reduced-motion`; plus a game-speed slider, effects
+  toggle, last-pressed-wins key override, and input buffering.
+- ⏳ Next (per DESIGN.md): accessibility (colorblind palette, remappable keys),
+  progression (medals/Daily Duty), the manor-hub campaign. Original tileset art +
+  servers are later.
 
 ## Run locally
 
