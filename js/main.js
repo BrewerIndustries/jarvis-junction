@@ -22,7 +22,7 @@ import { random_choice, mk, mk_svg } from './util.js';
 const DIRECTIONAL_ACTIONS = new Set(['up', 'down', 'left', 'right']);
 import * as util from './util.js';
 
-const PAGE_TITLE = "Lexy's Labyrinth";
+const PAGE_TITLE = "Jarvis's Junction";
 // This prefix is LLDEMO in base64, used to be somewhat confident that a string is a valid demo
 // (it's 6 characters so it becomes exactly 8 base64 chars with no leftovers to entangle)
 const REPLAY_PREFIX = "TExERU1P";
@@ -70,61 +70,61 @@ function make_button(label, onclick) {
 // - level password, if any
 const OBITUARIES = {
     drowned: [
-        "you tried out water cooling",
-        "you fell into the c",
-        "water disaster!",
-        "you sank like a rock",
-        "your stack overflowed",
+        "you took an unscheduled bath",
+        "the Master won't be pleased about the carpet",
+        "a most undignified splash",
+        "you went quite overboard",
+        "butlers do not swim on duty",
     ],
     burned: [
-        "your core temp got too high",
-        "your plans went up in smoke",
-        "you held your feet to the fire",
-        "you really blazed through that one",
-        "you turned up the heat",
+        "you singed the good gloves",
+        "the Master likes his tea hot, not his butler",
+        "you let the matter get rather heated",
+        "you made a most warm exit",
+        "up in smoke, like the morning toast",
     ],
     slimed: [
-        "you mutated",
-        "quite a sticky situation",
-        "you were garbage collected",
-        "that'll leave a stain",
-        "what a waste",
+        "a dreadful mess to clean up",
+        "you'll want to change before dinner",
+        "the Master mustn't see you like this",
+        "that will never come out in the wash",
+        "how terribly unbecoming",
     ],
     exploded: [
-        "you blew it",
-        "you're having a blast",
-        "you became 64 bits",
-        "you will surely be mist",
-        "try not to trip",
+        "you mishandled the Master's effects",
+        "one does not touch the good china",
+        "a most explosive faux pas",
+        "you'll be dusting yourself off for weeks",
+        "that was decidedly not on today's list",
     ],
     squished: [
-        "you encountered a block of ram",
-        "you became two-dimensional",
-        "your hit box collided",
-        "nice compression ratio",
-        "you took a cube route",
+        "flattened in the line of duty",
+        "you were rather steamrolled",
+        "a pressing engagement, indeed",
+        "caught between a rock and a hard place",
+        "do mind where one stands",
     ],
     time: [
-        "you tried to overclock",
-        "you lost track of time",
-        "your speedrun went badly",
-        "you overslept",
-        "you got ticked off",
+        "you kept the Master waiting",
+        "punctuality is everything",
+        "tardiness ill becomes a butler",
+        "the clock waits for no one",
+        "you quite overslept your duties",
     ],
     electrocuted: [
-        "a shocking revelation",
-        "danger: high voltage",
-        "inadequate insulation",
-        "rode the lightning",
+        "a most shocking lapse",
+        "mind the wiring, do",
+        "you gave yourself quite a jolt",
+        "the Master's electrics are temperamental",
     ],
     fell: [
-        "some say she's still falling",
-        "look before you leap",
-        "where's my ladder",
-        "it's dark down here",
+        "mind the trapdoor next time",
+        "look before you leap, always",
+        "wherever has the good ladder got to",
+        "it is rather dark down here",
     ],
     generic: [
-        "you had a bad time",
+        "a poor showing, I'm afraid",
     ],
 
     // Specific creatures
@@ -686,7 +686,7 @@ class Player extends PrimaryView {
         };
         this.mobile_pause_menu = mk('div.mobile-pause-menu',
             // waiting
-            btn("Play", {'class': 'button-bright -only-waiting'}, () => {
+            btn("Begin duty", {'class': 'button-bright -only-waiting'}, () => {
                 this.set_state('playing');
             }),
             // paused
@@ -713,7 +713,7 @@ class Player extends PrimaryView {
                         this.conductor.maybe_change_level(this.conductor.level_index - 1);
                     });
                 }),
-                btn("Level select", () => {
+                btn("Duty roster", () => {
                     // TODO this should really be in the level browser itself since you can check
                     // scores without losing a game
                     this.confirm_game_interruption("Abandon this attempt?", () => {
@@ -726,8 +726,8 @@ class Player extends PrimaryView {
                     });
                 }),
             ),
-            btn("Quit to pack list", () => {
-                this.confirm_game_interruption("Abandon this attempt and return to the pack list?", () => {
+            btn("Back to the agenda", () => {
+                this.confirm_game_interruption("Abandon this attempt and return to the agenda?", () => {
                     this.conductor.switch_to_splash();
                 });
             }),
@@ -2323,12 +2323,12 @@ class Player extends PrimaryView {
                 mk('h3', stored_level.author ? `by ${stored_level.author}` : "\u200b"),
                 this.mobile_pause_menu,
                 mk('div.-best-score', best_score),
-                mk('p.-controls-hint.--touch', "tap to start"),
+                mk('p.-controls-hint.--touch', "tap to begin your duty"),
                 mk('p.-controls-hint.--no-touch', "WASD/↑←↓→ to move · space to idle"),
             );
         }
         else if (this.state === 'paused') {
-            overlay.append(mk('h2', "/// paused ///"));
+            overlay.append(mk('h2', "/// at ease ///"));
             overlay.append(this.mobile_pause_menu);
             overlay.append(mk('p.-controls-hint.--touch', "tap to resume"));
             overlay.append(mk('p.-controls-hint.--no-touch', "press space to resume"));
@@ -2341,7 +2341,7 @@ class Player extends PrimaryView {
                 overlay.setAttribute('data-reason', 'failure');
                 let obits = OBITUARIES[this.level.fail_reason] ?? OBITUARIES['generic'];
                 overlay.append(
-                    mk('h2', "whoops" + random_choice(["", "!", "?", "..."])),
+                    mk('h2', "dear me" + random_choice(["", "!", "?", "...", ","])),
                     mk('h3', random_choice(obits)),
                     this.mobile_pause_menu,
                     mk('p.-controls-hint.--touch', "tap to try again, or use undo/rewind above"),
@@ -2418,29 +2418,29 @@ class Player extends PrimaryView {
                 let quip;
                 if (this.level.chips_remaining > 0) {
                     quip = random_choice([
-                        "socket to em!", "go bug blaster!",
+                        "the door yields!", "duty discharged!",
                     ]);
                 }
                 else if (this.level.time_remaining && this.level.time_remaining < 200) {
                     quip = random_choice([
-                        "in the nick of time!", "cutting it close!",
+                        "in the nick of time, sir!", "cutting it rather close!",
                     ]);
                 }
                 else if (time_left_fraction !== null && time_left_fraction > 1) {
                     quip = random_choice([
-                        "faster than light!", "impossible speed!", "pipelined!",
+                        "impeccably swift!", "with time to spare!", "most punctual!",
                     ]);
                 }
                 else if (time_left_fraction !== null && time_left_fraction > 0.75) {
                     quip = random_choice([
-                        "lightning quick!", "nice speedrun!", "eagerly evaluated!",
+                        "briskly done!", "most efficient!", "smartly handled!",
                     ]);
                 }
                 else {
                     quip = random_choice([
-                        "you did it!", "nice going!", "great job!", "good work!",
-                        "onwards!", "tubular!", "yeehaw!", "hot damn!",
-                        "alphanumeric!", "nice dynamic typing!",
+                        "very good, sir.", "duty discharged.", "impeccably done.",
+                        "at your service.", "consider it handled.", "a job well done.",
+                        "the Master will be pleased.", "onwards!",
                     ]);
                 }
                 overlay.append(mk('h2', quip));
@@ -3002,7 +3002,7 @@ class Splash extends PrimaryView {
         let button = mk('button.button-big.button-bright', {type: 'button'}, title);
         if (packdef) {
             button.addEventListener('click', ev => {
-                this.conductor.fetch_pack(packdef.path, packdef.title, packdef.ident);
+                this.conductor.fetch_pack(packdef.path, packdef.title, packdef.ident, true);
             });
         }
         else {
@@ -3104,7 +3104,7 @@ class Splash extends PrimaryView {
     }
 
     // Look for something we can load, and load it
-    async search_multi_source(source) {
+    async search_multi_source(source, title = null, override_title = false) {
         let paths;
         if (Array.fromAsync) {
             paths = await Array.fromAsync(source.iter_all_files());
@@ -3127,7 +3127,7 @@ class Splash extends PrimaryView {
             // TODO this can't load an individual c2m, hmmm
             if (ext === 'c2g' || ext === 'dat' || ext === 'ccl') {
                 let buf = await source.get(path);
-                await this.conductor.parse_and_load_game(buf, source, path);
+                await this.conductor.parse_and_load_game(buf, source, path, null, title, override_title);
                 break;
             }
         }
@@ -4675,22 +4675,23 @@ class Conductor {
 
     // FIXME all this api fucking sucks lol.  a pack definition should probably be a Thing?  how
     // does the canonical ident even come into play here???  does it?????????
-    async fetch_pack(path, title, identifier) {
+    async fetch_pack(path, title, identifier, override_title = false) {
         let solutions;
         if (this.player.debug.enabled) {
-            if (title === "Chip's Challenge Level Pack 1") {
+            // Match by path, not display title, so renamed packs still find solutions.
+            if (path === 'levels/CCLP1.ccl') {
                 let solutions_buf = await util.fetch('levels/public_CCLP1-lynx.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
             }
-            else if (title === "Chip's Challenge Level Pack 2-X") {
+            else if (path === 'levels/CCLXP2.ccl') {
                 let solutions_buf = await util.fetch('levels/public_CCLXP2.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
             }
-            else if (title === "Chip's Challenge Level Pack 3") {
+            else if (path === 'levels/CCLP3.ccl') {
                 let solutions_buf = await util.fetch('levels/public_CCLP3-lynx.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
             }
-            else if (title === "Chip's Challenge Level Pack 4") {
+            else if (path === 'levels/CCLP4.ccl') {
                 let solutions_buf = await util.fetch('levels/public_CCLP4-lynx.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
             }
@@ -4704,7 +4705,7 @@ class Conductor {
         // TODO handle errors
         // TODO cancel a download if we start another one?
         let buf = await util.fetch(path);
-        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, identifier, title);
+        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, identifier, title, override_title);
         if (solutions) {
             this.stored_game.level_replays = solutions.levels;
             // A bit rude, but since parse_and_load_game already switched us to the player, which
@@ -4718,7 +4719,7 @@ class Conductor {
         }
     }
 
-    async parse_and_load_game(buf, source, path, identifier, title) {
+    async parse_and_load_game(buf, source, path, identifier, title, override_title = false) {
         if (! identifier) {
             identifier = this.extract_identifier_from_path(path);
         }
@@ -4746,7 +4747,7 @@ class Conductor {
             // That's the ZIP header
             // FIXME move this here i guess and flesh it out some
             // FIXME if this doesn't find something then we should abort
-            await this.splash.search_multi_source(new util.ZipFileSource(buf));
+            await this.splash.search_multi_source(new util.ZipFileSource(buf), title, override_title);
             return;
         }
         else if (magic.toLowerCase() === 'game') {
@@ -4782,7 +4783,12 @@ class Conductor {
             throw new Error("Unrecognized file format");
         }
 
-        if (! stored_game.title) {
+        // Built-in packs force our display title (override_title); otherwise the
+        // pack file's own embedded title wins, falling back to the passed title.
+        if (override_title && title) {
+            stored_game.title = title;
+        }
+        else if (! stored_game.title) {
             stored_game.title = title ?? identifier ?? "Untitled pack";
         }
 
@@ -4823,7 +4829,7 @@ class Conductor {
             // Built-in pack
             if (BUILTIN_PACKS_BY_IDENT[path]) {
                 let packdef = BUILTIN_PACKS_BY_IDENT[path];
-                await this.fetch_pack(packdef.path, packdef.title, packdef.ident);
+                await this.fetch_pack(packdef.path, packdef.title, packdef.ident, true);
             }
             // GliderBot-hosted path
             else if (path.startsWith('gb:')) {
