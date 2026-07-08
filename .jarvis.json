@@ -1,0 +1,12 @@
+{
+  "id": "jarvis-junction",
+  "name": "Jarvis's Junction",
+  "description": "A butler-themed tile puzzle game — every level is another duty for the Master of the House. A fan reimagining built on the open-source Lexy's Labyrinth engine (Chip's Challenge-compatible), with original art, sound, and music.",
+  "category": "games",
+  "tech": ["Vanilla JS (ES modules)", "HTML5 Canvas", "static site", "GitHub Pages"],
+  "status": { "prod": "in_progress", "dev": "live" },
+  "deploy": {
+    "prod": { "url": "https://jarvis-junction.dabrewer.dev/" },
+    "dev": { "url": "https://jarvis-junction.dabrewer.dev/dev/" }
+  }
+}

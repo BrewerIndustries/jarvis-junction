@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf8">
+    <title>Jarvis's Junction</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="shortcut icon" type="image/png" href="icon.png">
+    <script>
+        "use strict";
+        {
+            let domloaded = false;
+            window.addEventListener('DOMContentLoaded', ev => domloaded = true);
+
+            let _ll_log_fatal_error = (err, ev) => {
+                document.getElementById('loading').setAttribute('hidden', '');
+                let failed = document.getElementById('failed');
+                failed.removeAttribute('hidden');
+                document.body.setAttribute('data-mode', 'failed');
+
+                failed.classList.add('--got-error');
+                let stack = '(origin unknown)';
+                if (err.stack && err.stack.match(/\n/)) {
+                    // Chrome sometimes gives us a stack that's actually just the message without
+                    // any filenames, in which case skip it
+                    stack = err.stack.replace(/^/mg, "  ");
+                }
+                else if (err.fileName) {
+                    stack = `in ${err.fileName} at ${err.lineNumber}:${err.columnNumber}`;
+                }
+                else if (ev) {
+                    stack = `in ${ev.filename} at ${ev.lineno}:${ev.colno}`;
+                }
+                failed.querySelector('pre').textContent = `${err.toString()}\n\n${stack}`;
+            };
+            window.ll_log_fatal_error = function(err, ev) {
+                if (domloaded) {
+                    _ll_log_fatal_error(err, ev);
+                }
+                else {
+                    window.addEventListener('DOMContentLoaded', () => _ll_log_fatal_error(err, ev));
+                }
+            };
+            let error_listener = ev => {
+                if (! ev.error)
+                    // Not a script error
+                    return;
+                try {
+                    ll_log_fatal_error(ev.error, ev);
+                }
+                catch (err) {}
+            };
+            window.addEventListener('error', error_listener, true);
+            // Once we've loaded successfully, drop the handler
+            window.ll_successfully_loaded = function() {
+                window.removeEventListener('error', error_listener, true);
+            };
+        }
+    </script>
+    <!-- FIXME it would be super swell if i could load this lazily -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script type="module" src="js/main.js"></script>
+    <meta name="og:type" content="website">
+    <meta name="og:image" content="og-preview.png">
+    <meta name="og:title" content="Jarvis's Junction">
+    <meta name="og:description" content="Free online puzzle game that emulates Chip's Challenge.  Play hundreds of community curated levels, load the levels from the commercial games, or make your own with the built-in editor.">
+    <meta name="description" content="Free online puzzle game that emulates Chip's Challenge.  Play hundreds of community curated levels, load the levels from the commercial games, or make your own with the built-in editor.">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+</head>
+<body data-mode="failed">
+    <script>document.body.setAttribute('data-mode', 'loading');</script>
+    <svg id="svg-iconsheet">
+    <defs>
+        <g id="svg-icon-menu-chevron">
+            <path d="M2,4 l6,6 l6,-6 v3 l-6,6 l-6,-6 z"></path>
+        </g>
+        <g id="svg-icon-prev">
+            <path d="M14,1 2,8 14,14 z">
+        </g>
+        <g id="svg-icon-next">
+            <path d="M2,1 14,8 2,14 z">
+        </g>
+        <g id="svg-icon-step-mode">
+            <!-- This one /may/ have been drawn in Inkscape but I'll never tell -->
+            <circle cx="6" cy="4" r="2"></circle>
+            <circle cx="11" cy="5" r="2"></circle>
+            <circle cx="12" cy="10" r="2"></circle>
+            <path d="M 4,12
+                C 3,11 2,11 2,9 2,7 4,7 5,7
+                c 1,0 2,0 3,1 1,1 1,2 1,3 0,1 0,3 -2,3 -2,0 -2,-1 -3,-2
+                z"></path>
+        </g>
+        <!-- Actions -->
+        <g id="svg-icon-up">
+            <path d="M0,12 l8,-8 l8,8 z"></path>
+        </g>
+        <g id="svg-icon-right">
+            <use href="#svg-icon-up" transform="rotate(90 8 8)"></use>
+        </g>
+        <g id="svg-icon-down">
+            <use href="#svg-icon-up" transform="rotate(180 8 8)"></use>
+        </g>
+        <g id="svg-icon-left">
+            <use href="#svg-icon-up" transform="rotate(270 8 8)"></use>
+        </g>
+        <g id="svg-icon-drop">
+            <path d="M6,0 h4 v9 h3 l-5,5 h7 v2 h-14 v-2 h7 l-5,-5 h3"></path>
+        </g>
+        <g id="svg-icon-cycle">
+            <path d="M2,3 H11 V1 l4,4 -4,4 V7 H2 Z"></path>
+            <path d="M14,9 H5 V7 l-4,4 4,4 v-2 h9 z"></path>
+        </g>
+        <g id="svg-icon-swap">
+            <path d="m 7,1 h 2 l 1,1 V 6 L 9,7 v 4 L 8,11.5 7,11 V 7 L 6,6 V 2 Z"></path>
+            <path d="M 8,13 13,11 8,9 3,11 Z m 0,2 7,-3 V 11 L 8,8 1,11 v 1 z"></path>
+            <ellipse cx="5.5" cy="11" rx="0.75" ry="0.5"></ellipse>
+        </g>
+        <!-- Hint background -->
+        <g id="svg-icon-hint">
+            <path d="M1,8 a7,7 0 1,1 14,0 7,7 0 1,1 -14,0 M2,8 a6,6 0 1,0 12,0 6,6 0 1,0 -12,0"></path>
+            <path d="M5,6 a1,1 0 0,0 2,0 a1,1 0 1,1 1,1 a1,1 0 0,0 -1,1 v1 a1,1 0 1,0 2,0 v-0.17 A3,3 0 1,0 5,6"></path>
+            <circle cx="8" cy="12" r="1"></circle>
+        </g>
+        <!-- Editor stuff -->
+        <g id="svg-icon-zoom">
+            <path d="M1,6 a5,5 0 1,1 10,0 a5,5 0 1,1 -10,0 m2,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"></path>
+            <path d="M14,12 l-2,2 -4,-4 2,-2 4,4"></path>
+        </g>
+        <g id="svg-icon-mouse1">
+            <path d="
+                M9,2 a3,3 0 0,1 3,3 v5 a4,4 0 0,1 -8,0 v-5 a3,3 0 0,1 3,-3 z
+                M9,3 v5 h-4 v-3 a2,2 0 0,1 2,-2 h1 z
+            "></path>
+                <!--M9,3 a2,2 0 0,0 -2,2 v3 h3 z-->
+        </g>
+        <g id="svg-icon-mouse2">
+            <path d="
+                M9,2 a3,3 0 0,1 3,3 v5 a4,4 0 0,1 -8,0 v-5 a3,3 0 0,1 3,-3 z
+                M7,3 h2 a2,2 0 0,1 2,2 v3 h-4 v-5 z
+            "></path>
+        </g>
+    </defs>
+    </svg>
+    <header id="header-main">
+        <img id="header-icon" src="icon.png" alt="">
+        <h1>Jarvis's Junction</h1>
+        <p>— based on <a href="https://github.com/eevee/lexys-labyrinth">Lexy's Labyrinth</a>, an open source game by <a href="https://eev.ee/">eevee</a></p>
+        <nav>
+            <button id="main-compat" type="button"><img src="icons/compat-lexy.png" alt=""> <output>lexy</output></button>
+            <button id="main-options" type="button">options</button>
+        </nav>
+    </header>
+    <header id="header-pack">
+        <h2 id="level-pack-name">Chip's Challenge Level Pack 1</h2>
+        <nav>
+            <button id="main-test-pack" type="button">Bulk test</button>
+            <button id="main-change-pack" type="button">Change pack</button>
+            <button id="player-edit" type="button">Edit</button>
+            <button id="editor-play" type="button">Play</button>
+        </nav>
+    </header>
+    <header id="header-level">
+        <h3 id="level-name">Level 1 — Key Pyramid</h3>
+        <nav>
+            <button id="main-prev-level" type="button">
+                <svg class="svg-icon" viewBox="0 0 16 16" title="previous"><use href="#svg-icon-prev"></svg>
+            </button>
+            <button id="main-choose-level" type="button">Level select</button>
+            <button id="main-next-level" type="button">
+                <svg class="svg-icon" viewBox="0 0 16 16" title="next"><use href="#svg-icon-next"></svg>
+            </button>
+        </nav>
+    </header>
+    <main id="failed">
+        <h1>oops!</h1>
+        <p>Sorry, the game was unable to load at all.</p>
+        <p>If you have JavaScript partly or wholly blocked, I salute you!  ...but this is an interactive game and cannot work without it.</p>
+        <p>If not, it's possible that the game updated, but you have a mix of old and new code.  Try a hard refresh (Ctrl-Shift-R).</p>
+        <p class="-with-error">I did manage to capture this error, which you might be able to <a href="https://github.com/eevee/lexys-labyrinth/issues/new">report somewhere</a>:</p>
+        <pre class="-with-error stack-trace"></pre>
+    </main>
+    <main id="loading" hidden>
+        <p>...loading...</p>
+        <div class="scrolling-sidewalk">
+            <img src="loading.gif" alt="Lexy walking">
+        </div>
+    </main>
+    <script>
+        document.querySelector('#failed').setAttribute('hidden', '');
+        document.querySelector('#loading').removeAttribute('hidden');
+    </script>
+    <main id="splash" hidden>
+        <header>
+            <img src="og-preview.png" alt="">
+            <h1>Jarvis's Junction</h1>
+            <p>the duties of a most dutiful butler — every level another task for the Master of the House</p>
+            <button id="splash-fullscreen" type="button" title="Toggle fullscreen">
+                <svg class="svg-icon" viewBox="0 0 16 16">
+                    <path d="m 11,1 h 4 V 5 L 14,4 12,6 10,4 12,2 Z"></path>
+                    <path d="m 11,15 h 4 v -4 l -1,1 -2,-2 -2,2 2,2 z"></path>
+                    <path d="M 5,1 H 1 V 5 L 2,4 4,6 6,4 4,2 Z"></path>
+                    <path d="M 5,15 H 1 v -4 l 1,1 2,-2 2,2 -2,2 z"></path>
+                </svg>
+            </button>
+        </header>
+        <div id="splash-links">
+            <a href="https://github.com/eevee/lexys-labyrinth/wiki">About</a>
+            <a href="https://github.com/eevee/lexys-labyrinth/wiki/How-To-Play">How to play</a>
+            <a href="https://github.com/eevee/lexys-labyrinth">Source code and more</a>
+            <a href="https://patreon.com/eevee">Support on Patreon</a>
+        </div>
+        <p id="splash-disclaimer"><strong>Chip's Challenge</strong> is a registered trademark of Bridgestone Media Group LLC, used here for identification purposes only.  Not affiliated with, sponsored, or endorsed by Bridgestone Media Group LLC.</p>
+
+        <p id="splash-premise">Good day. You are <strong>Jarvis</strong>, butler to the Master of the House — and the household never runs itself. Each level is a duty on today's list: collect what's needed, mind the hazards below stairs, and see yourself to the door. Ring the bell (press a key) to begin your service.</p>
+
+        <section id="splash-stock-levels">
+            <h2>Today's duties</h2>
+            <ul class="played-pack-list" id="splash-stock-pack-list">
+                <!-- populated by js -->
+            </ul>
+
+            <h2>More levels</h2>
+            <p>Supports CCL/DAT, C2G, C2M, and ZIP; drag and drop; and both custom and official levels.  <a href="https://github.com/eevee/lexys-labyrinth/wiki/Loading-Levels">More details</a></p>
+            <div class="button-row">
+                <input id="splash-upload-file" type="file" accept=".dat,.ccl,.c2m,.ccs,.zip" multiple>
+                <input id="splash-upload-dir" type="file" webkitdirectory>
+                <button type="button" id="splash-upload-file-button" class="button-big button-bright">Load files</button>
+                <button type="button" id="splash-upload-dir-button" class="button-big button-bright">Load directory</button>
+            </div>
+            <ul class="played-pack-list" id="splash-other-pack-list">
+                <!-- populated by js -->
+            </ul>
+        </section>
+
+        <section id="splash-your-levels">
+            <h2>Create</h2>
+            <div class="button-row">
+                <button type="button" id="splash-create-pack" class="button-big button-bright">New pack</button>
+                <button type="button" id="splash-create-level" class="button-big button-bright">New scratch level<br>(won't be saved!)</button>
+            </div>
+        </section>
+        <div class="drag-overlay"></div>
+    </main>
+    <main id="player" hidden>
+        <div id="player-main">
+            <div id="player-controls">
+                <button class="control-pause" type="button" title="pause">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></path></svg>
+                    <span class="-optional-label">pause</span> <span class="keyhint"><kbd>p</kbd></span></button>
+                <button class="control-restart" type="button" title="restart">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></path></svg>
+                    <span class="-optional-label">retry</span> <span class="keyhint"><kbd>r</kbd></span></button>
+                <button class="control-undo" type="button" title="undo">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></path></svg>
+                    <span class="-optional-label">undo</span> <span class="keyhint"><kbd>u</kbd></span></button>
+                <button class="control-rewind" type="button" title="rewind">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></path></svg>
+                    <span class="-optional-label">rewind</span> <span class="keyhint"><kbd>z</kbd></span></button>
+                <button class="control-turn-based" type="button" title="step mode">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-step-mode"></use></svg>
+                    <span class="-optional-label">step<br>mode</span></button>
+            </div>
+            <div id="player-actions">
+                <button class="action-drop" type="button">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-drop"></use></svg>
+                    <span class="-optional-label">drop</span> <span class="keyhint"><kbd>q</kbd></span></button>
+                <button class="action-cycle" type="button">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-cycle"></use></svg>
+                    <span class="-optional-label">cycle</span> <span class="keyhint"><kbd>e</kbd></span></button>
+                <button class="action-swap" type="button">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-swap"></use></svg>
+                    <span class="-optional-label">switch</span> <span class="keyhint"><kbd>c</kbd></span></button>
+            </div>
+            <section id="player-game-area">
+                <div class="level"><!-- level canvas and any overlays go here --></div>
+                <div class="player-overlay-message"></div>
+                <div class="player-overlay-captions"></div>
+                <div class="player-hint-wrapper">
+                    <div class="player-hint"></div>
+                    <svg class="player-hint-bg-icon svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-hint"></use></svg>
+                </div>
+                <div class="player-level-number">
+                    Level
+                    <output></output>
+                </div>
+                <div class="chips">
+                    <h3>
+                        <svg class="svg-icon" viewBox="0 0 16 16" title="Hearts">
+                            <path d="M4,2 C 2,2 1,4 1,6 C 1,8 2,10 4,12 C 6,14 8,15 8,15 C 8,15 10,14 12,12 C 14,10 15,8 15,6 C 15,4 14,2 12,2 C 10,2 8,5 8,5 C 8,5 6,2 4,2 z M12,4 C 12,5 13,6 14,6 C 13,6 12,7 12,8 C 12,7 11,6 10,6 C 11,6 12,5 12,4 z"></path>
+                        </svg>
+                    </h3>
+                    <output></output>
+                </div>
+                <div class="time">
+                    <h3>
+                        <svg class="svg-icon" viewBox="0 0 16 16" title="Time">
+                            <path d="M 7,3 A -6,6 0 0 1 13,9 -6,6 0 0 1 7,15 -6,6 0 0 1 1,9 -6,6 0 0 1 7,3 Z M 7,4 A -5,5 0 0 0 2,9 -5,5 0 0 0 7,14 -5,5 0 0 0 12,9 -5,5 0 0 0 7,4 Z"></path>
+                            <!-- cap -->
+                            <path d="M 15,4 12,1 c -1,0 -1,0 -1,1 l 1,1 -2,2 1,1 2,-2 1,1 c 1,0 1,0 1,-1 z"></path>
+                            <!-- arrow -->
+                            <path d="M 8,9 10,6 7,8 Z"></path>
+                            <!-- center -->
+                            <circle cx="7" cy="9" r="1"></circle>
+                        </svg>
+                    </h3>
+                    <output></output>
+                </div>
+                <div class="bonus">
+                    <h3>
+                        <svg class="svg-icon" viewBox="0 0 16 16" title="Bonus">
+                            <circle cx="8" cy="8" r="4"></circle>
+                            <path d="m9,7 2,-6 c 2,0 1,1 2,2 1,1 2,0 2,2 z"></path>
+                            <path d="M7,9 5,15 C 3,15 4,14 3,13 2,12 1,13 1,11 z"></path>
+                        </svg>
+                    </h3>
+                    <output></output>
+                </div>
+                <div class="exits">
+                    <h3>
+                        <svg class="svg-icon" viewBox="0 0 16 16" title="Players remaining">
+                            <path d="M0,0 h 16 v 16 h -16 v -16 M2,2 h 12 v 12 h -12 z"></path>
+                            <path d="M4,4 h 8 v 8 h -8 v -8 M6,6 h 4 v 4 h -4 z"></path>
+                        </svg>
+                    </h3>
+                    <output></output>
+                </div>
+                <div class="player-rules">
+                    <p id="player-rule-compat-lynx" title="This level is known to have compatibility issues with the default Lexy rules, but is playable with the rules it was designed for.">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="M 5,1 C 4,1 3,2 3,3 v 9 c 0,1 0,1 -1,1 -1,0 -1,2 0,2 h 9 c 1,0 2,-1 2,-2 V 4 c 0,-1 0,-1 1,-1 1,0 1,-2 0,-2 z m 0,2 h 6 V 4 H 5 Z m 0,3 h 6 V 7 H 5 Z m 0,3 h 6 v 1 H 5 Z m 0,3 h 6 v 1 H 5 Z"></path></svg>
+                        <span>May require Lynx rules</span>
+                    </p>
+                    <p id="player-rule-logic-hidden" title="In this level, wires and logic gates are invisible.  X-ray glasses will reveal them.">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 a7,7 0 0,1 14,0 7,7 0 0,1 -14,0 M3,8 a5,5 0 0,1 10,0 5,5 0 0,1 -10,0"></path><path d="M2,7 h5 v-5 h2 v5 h5 v2 h-5 v5 h-2 v-5 h-5 v-2"></path><path d="M1,14 L14,1 l1,1 L2,15 l-1,-1"></path></svg>
+                        <span>Logic hidden</span>
+                    </p>
+                    <p id="player-rule-cc1-boots" title="In this level, tools cannot be dropped, and only the tools available in CC1 (cleats, suction boots, fire boots, and flippers) can be picked up.">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="m 1,12 v 3 h 3 l 5,-5 h 3 L 15,7 V 4 L 12,7 H 11 L 9,5 V 4 L 12,1 H 9 L 6,4 v 3 z"></path></svg>
+                        <span>Retro inventory</span>
+                    </p>
+                </div>
+                <div class="inventory"></div>
+            </section>
+            <div id="player-music">
+                🎵 <a id="player-music-title" target="_blank">title</a> by <a id="player-music-author" target="_blank">author</a>
+                <audio loop preload="auto">
+            </div>
+        </div>
+        <form id="player-debug">
+            <h3>Time</h3>
+            <table class="-time-controls">
+                <tr>
+                    <td><button type="button" class="-time-button" data-dt="-1">← 1 tic</button></td>
+                    <td id="player-debug-time-tics">0</td>
+                    <td>tics</td>
+                    <td><button type="button" class="-time-button" data-dt="1">1 tic →</button></td>
+                </tr>
+                <tr>
+                    <td><button type="button" class="-time-button" data-dt="-4">← 1 move</button></td>
+                    <td id="player-debug-time-moves">0</td>
+                    <td>moves</td>
+                    <td><button type="button" class="-time-button" data-dt="4">1 move →</button></td>
+                </tr>
+                <tr>
+                    <td><button type="button" class="-time-button" data-dt="-20">← 1 s</button></td>
+                    <td id="player-debug-time-secs">0</td>
+                    <td>seconds</td>
+                    <td><button type="button" class="-time-button" data-dt="20">1 s →</button></td>
+                </tr>
+            </table>
+            <div class="-buttons" id="player-debug-time-buttons">
+                <!-- populated in js -->
+            </div>
+            <div id="player-debug-speed" class="radio-faux-button-set">
+                <label><input type="radio" name="speed" value="1/4"><span class="-button">¼</span></label>
+                <label><input type="radio" name="speed" value="1/3"><span class="-button">⅓</span></label>
+                <label><input type="radio" name="speed" value="1/2"><span class="-button">½</span></label>
+                <label><input type="radio" name="speed" value="1"><span class="-button"><strong>1×</strong></span></label>
+                <label><input type="radio" name="speed" value="2"><span class="-button">2</span></label>
+                <label><input type="radio" name="speed" value="3"><span class="-button">3</span></label>
+                <label><input type="radio" name="speed" value="5"><span class="-button">5</span></label>
+                <label><input type="radio" name="speed" value="10"><span class="-button">10</span></label>
+                <label><input type="radio" name="speed" value="25"><span class="-button">25</span></label>
+                <label><input type="radio" name="speed" value="100"><span class="-button">100</span></label>
+            </div>
+
+            <h3>Inventory</h3>
+            <div class="-inventory">
+                <!-- populated in js -->
+            </div>
+
+            <h3>Replay</h3>
+            <!-- TODO...
+                play back replay
+                record replay, including altering it from here
+                stop replay, without restarting the level
+                show progress in %, length in tics + time
+                browse replay?  jump to any point?  label points???
+                edit manually?
+            -->
+            <div class="-replay-columns">
+                <div id="player-debug-input"></div>
+                <div class="-replay-status">
+                    <!-- This should be a fixed height and is always showing one of the following -->
+                    <div class="-none">No replay in progress</div>
+                    <div class="-playback">
+                        <progress max="0" value="0"></progress>
+                        <output>100%</output>
+                        <span>0 tics (0:00s)</span>
+                        <button disabled>Relinquish control</button>
+                    </div>
+                    <div class="-recording">Recording...</div>
+                </div>
+            </div>
+            <!-- js inserts a bunch of stuff here -->
+
+            <h3>Misc</h3>
+            <p>Viewport size:
+                <select id="player-debug-viewport">
+                    <option value="default" selected>Standard</option>
+                    <option value="12">12 × 12</option>
+                    <option value="16">16 × 16</option>
+                    <option value="24">24 × 24</option>
+                    <option value="32">32 × 32</option>
+                    <option value="max">Entire level</option>
+                </select>
+            </p>
+            <ul>
+                <li><label><input type="checkbox" name="disable_interpolation"> Disable interpolation</label></li>
+                <li><label><input type="checkbox" name="show_actor_bboxes"> Show actor bounding boxes</label></li>
+                <li><label><input type="checkbox" name="show_actor_order"> Show actor order</label></li>
+                <li><label><input type="checkbox" name="show_actor_tooltips"> Show actor tooltips</label></li>
+                <!--
+                <li><label><input type="checkbox" disabled> Freeze time for everything else</label></li>
+                <li><label><input type="checkbox" disabled> Player is immortal</label></li>
+                <li><label><input type="checkbox" disabled> Player ignores collision</label></li>
+                <li><label><input type="checkbox" disabled> Player levitates</label></li>
+                -->
+            </ul>
+            <div class="-buttons" id="player-debug-misc-buttons">
+                <!-- populated in js -->
+            </div>
+            <p>Tip: Middle-click to teleport.</p>
+            <!-- TODO?
+                - inspect with mouse
+                    - list of actors, or currently pointed-to actor?
+                - activate something manually?
+                - click a button ingame?
+                - pan viewport (like editor)
+                - show connections, directions, other editor features
+                - look under anything
+
+                - other game info?
+                    - count tiles?
+                    - total hearts?
+                    - total bonus flags?
+            -->
+        </form>
+    </main>
+    <main id="editor" hidden>
+        <header></header>
+        <div class="editor-canvas">
+            <div class="-container">
+                <!-- level canvas and any overlays go here -->
+                <!-- the container is to allow them to scroll as a single unit -->
+            </div>
+        </div>
+        <nav class="-menubar"></nav>
+        <nav class="-tools"></nav>
+        <div class="-palette"></div>
+        <div id="editor-statusbar"></div>
+    </main>
+</body>
+</html>

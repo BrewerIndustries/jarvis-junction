@@ -1,0 +1,2962 @@
+html {
+    font-size: 16px;
+    height: 100vh;
+    height: 100dvh;
+}
+body {
+    height: 100%;
+    margin: 0;
+    box-sizing: border-box;
+
+    display: flex;
+    flex-direction: column;
+
+    font-family: Ubuntu, Source Sans Pro, DejaVu Sans, sans-serif;
+    line-height: 1.33;
+    background: hsl(var(--main-hue), 5%, 5%);
+    background-image: url(background.svg);
+    background-size: 12em;
+    color: #ececec;
+
+    --main-hue: 340;
+    --hover-hue: 15;
+    --selected-hue: 320;
+    --panel-bg-color: hsl(var(--main-hue), 20%, 12.5%);
+    --button-bg-color: hsl(var(--main-hue), 60%, 30%);
+    --button-bg-gradient: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
+    --button-bg-shadow-color: #fff1;
+    --button-bg-hover-color: hsl(var(--hover-hue), 80%, 40%);
+    --generic-bg-hover-on-white: hsl(var(--hover-hue), 90%, 85%);
+    --generic-bg-selected-on-white: hsl(var(--selected-hue), 50%, 85%);
+    --generic-border-selected-on-white: hsl(var(--selected-hue), 60%, 75%);
+}
+
+/* Generic element styling */
+main[hidden] {
+    display: none !important;
+}
+input[type=radio],
+input[type=checkbox],
+input[type=range] {
+    font-size: inherit;
+    margin: 0.125em;
+    vertical-align: middle;
+}
+input[type=number] {
+    font-size: inherit;
+    width: 4em;
+    width: 8ch;
+    text-align: right;
+}
+button,
+.radio-faux-button-set > label > input + span {
+    font-size: inherit;
+    padding: 0.25em 0.5em;
+    font-family: inherit;
+    color: white;
+    background-color: var(--button-bg-color);
+    background-image: var(--button-bg-gradient);
+    border: 1px solid hsl(var(--main-hue), 10%, 2.5%);
+    box-shadow:
+        inset 0 0 0 1px #ffffff18,
+        0 1px 1px hsl(var(--main-hue), 10%, 7.5%);
+    border-radius: 0.25em;
+    text-shadow: 0 1px 0 #0006;
+    text-transform: lowercase;
+    cursor: pointer;
+}
+button:hover,
+.radio-faux-button-set > label:hover > input + span {
+    background-color: var(--button-bg-hover-color);
+}
+button:active,
+.radio-faux-button-set > label:active > input + span {
+    transform: translateY(1px);
+    /* Need this for the editor's tool help things and i'm not questioning it */
+    z-index: 1;
+}
+button:enabled.button-bright {
+    background-color: hsl(var(--main-hue), 60%, 45%);
+}
+button:enabled.button-bright:hover {
+    background-color: hsl(var(--hover-hue), 70%, 50%);
+}
+button:disabled {
+    color: #999;
+    background-color: #444;
+    cursor: auto;
+}
+button.button-big {
+    display: block;
+    width: 100%;
+    margin: 0.5em 0;
+    padding: 1em;
+}
+button.--button-glow-ok {
+    background: hsl(var(--main-hue), 100%, 50%);
+}
+button.--button-glow {
+    transition: background-color 0.5s ease-out;
+}
+button.--image {
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+}
+button.--image img {
+    display: block;
+}
+select {
+    font-size: inherit;
+}
+h1, h2, h3, h4, h5, h6 {
+    font-weight: normal;
+    margin: 0;
+}
+ul, ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+ul.normal-list {
+    margin-left: 1em;
+    list-style: disc;
+}
+ol.normal-list {
+    margin-left: 1.5em;
+    list-style: decimal;
+}
+p {
+    margin: 0.5em 0;
+}
+p:first-child {
+    margin-top: 0;
+}
+p:last-child {
+    margin-bottom: 0;
+}
+pre {
+    white-space: pre-wrap;
+}
+code {
+    color: #c0c0e0;
+}
+kbd {
+    padding: 0 0.25em;
+    border: 1px solid currentColor;
+    border-radius: 0.25em;
+    box-shadow: 0 2px 0 currentColor;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+a {
+    color: #c0c0c0;
+}
+a:link,
+a:visited {
+    text-decoration: underline dotted;
+}
+a:link {
+    color: hsl(var(--main-hue), 80%, 75%);
+}
+a:visited {
+    color: hsl(270, 80%, 75%);
+}
+a:link:hover,
+a:visited:hover {
+    text-decoration: underline;
+}
+a:active {
+    color: hsl(0, 90%, 75%);
+}
+
+svg#svg-iconsheet {
+    /* This is a collection of SVG icons to be re-<use>d */
+    display: none;
+}
+svg.svg-icon {
+    width: 1em;
+    height: 1em;
+    vertical-align: middle;
+
+    stroke: none;
+    fill: currentColor;
+    fill-rule: evenodd;
+}
+
+/* Set of radio buttons in a row, styled like buttons */
+/* (you know, like /actual/ radio buttons) */
+/* Button-esque styling is shared with the button definition above */
+.radio-faux-button-set {
+    display: flex;
+    align-items: stretch;
+    margin: 0.5em 0;
+}
+.radio-faux-button-set > label {
+    flex: 1;
+}
+.radio-faux-button-set > label > input {
+    display: none;
+}
+.radio-faux-button-set > label > input + span {
+    display: block;
+    box-sizing: border-box;
+    height: 100%;
+    border-radius: 0;
+    text-align: center;
+}
+.radio-faux-button-set > label:first-child > input + span {
+    border-top-left-radius: 0.25em;
+    border-bottom-left-radius: 0.25em;
+}
+.radio-faux-button-set > label:last-child > input + span {
+    border-top-right-radius: 0.25em;
+    border-bottom-right-radius: 0.25em;
+}
+button.--pressed,
+.radio-faux-button-set > label > input:checked + span {
+    background: hsl(var(--main-hue), 80%, 50%);
+    box-shadow:
+        inset 0 1px 3px 1px hsl(var(--main-hue), 50%, 15%),
+        inset 0 0.25em 1em 0.5em hsl(var(--main-hue), 50%, 30%),
+        0 1px 1px hsl(var(--main-hue), 10%, 10%)
+}
+
+.button-row {
+    display: grid;
+    /* Put the buttons in a row most of the time, but change to a column when out of space */
+    grid: auto-flow auto / repeat(auto-fit, minmax(10em, 1fr));
+    gap: 0.5em;
+    align-items: stretch;
+    margin: 0.5em 0;
+}
+.button-row > button {
+    margin: 0;
+}
+
+/* Overlay styling */
+.overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    isolation: isolate;
+    z-index: 1;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff4;
+}
+.overlay.--transient {
+    align-items: start;
+    justify-content: start;
+    background: none;
+}
+.popup-menu {
+    position: absolute;
+    min-width: 10vw;
+    border: 1px solid #999;
+    color: black;
+    background: hsl(var(--main-hue), 20%, 95%);
+    box-shadow: 0 1px 3px 1px #0009;
+}
+.popup-menu > li {
+    /* flex for shortcuts */
+    display: flex;
+    justify-content: space-between;
+    gap: 1em;
+
+    padding: 0.375em 0.625em;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.popup-menu > li > .-shortcut {
+    color: #444;
+}
+.popup-menu > li > .-shortcut > kbd {
+    font-size: 0.75rem;
+    vertical-align: 0.125rem;
+    background: #d8d8d8;
+    letter-spacing: -1px;
+    text-transform: lowercase;
+}
+.popup-menu > li.-separator {
+    height: 0;
+    margin: 0.25em 0;
+    padding: 0;
+    border-bottom: 1px solid #999;
+    cursor: default;
+}
+.popup-menu > li:hover {
+    color: hsl(var(--hover-hue), 60%, 10%);
+    background: var(--generic-bg-hover-on-white);
+}
+.dialog {
+    display: flex;
+    flex-direction: column;
+
+    min-width: 33vw;
+    max-width: 75vw;
+    max-height: 75vh;
+    border: 1px solid black;
+    color: black;
+    background: #f4f4f4;
+    box-shadow: 0 1px 6px #000c;
+}
+.dialog > header {
+    padding: 0.5em;
+    line-height: 1;
+    background: linear-gradient(
+        hsl(var(--main-hue), 40%, 50%),
+        hsl(var(--main-hue), 50%, 45%));
+    border-bottom: 1px solid hsl(var(--main-hue), 60%, 30%);
+    color: white;
+    text-shadow: 0 2px 0 #0006;
+}
+.dialog > header h1 {
+    font-size: 1.25em;
+}
+.dialog > footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+
+    padding: 0.5em;
+    background: #d0d0d0;
+}
+.dialog > footer > .-spacer {
+    flex: 1;
+}
+.dialog > header:empty,
+.dialog > footer:empty {
+    display: none;
+}
+.dialog > section {
+    flex: auto;
+    overflow: auto;
+    padding: 1em;
+}
+.dialog pre.error {
+    color: #400000;
+    background: #f0d0d0;
+    padding: 0.5em 1em;
+}
+.dialog a:link {
+    color: hsl(var(--main-hue), 50%, 50%);
+}
+.dialog a:visited {
+    color: hsl(255, 50%, 50%);
+}
+.dialog code {
+    color: hsl(var(--main-hue), 50%, 30%);
+}
+.dialog h2 {
+    color: hsl(var(--main-hue), 75%, 25%);
+    border-bottom: 1px dotted hsl(var(--main-hue), 50%, 40%);
+}
+.dialog h2:nth-child(n+1) {
+    margin-top: 1rem;
+}
+dl.formgrid {
+    display: grid;
+    grid: auto-flow min-content / 1fr 4fr;
+    align-items: baseline;
+    gap: 1em;
+    margin: 0;
+}
+dl.formgrid > dt {
+    grid-column: 1;
+    text-align: right;
+    color: hsl(var(--main-hue), 50%, 25%);
+}
+dl.formgrid > dd {
+    grid-column: 2;
+    margin: 0;
+}
+dl.formgrid > dd button {
+    margin: 0.25em 0;
+}
+dl.formgrid > dd button + button {
+    margin-left: 0.25em;
+}
+dl.formgrid > dd.-one-field {
+    display: flex;
+}
+dl.formgrid > dd.-textarea {
+    display: flex;
+    align-self: end;  /* make the <dt> align to the top */
+}
+dl.formgrid > dd.-one-field > *,
+dl.formgrid > dd.-textarea > * {
+    flex: auto;
+}
+dl.formgrid > dd.-with-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+dl.formgrid > dd > label {
+    display: block;
+}
+
+/* Individual overlays */
+table.level-browser {
+    width: 100%;
+    /* for some reason the table ignores the bottom padding when it overflows */
+    margin-bottom: 1em;
+    line-height: 1.25;
+    border-spacing: 0;
+}
+table.level-browser thead {
+    position: sticky;
+    top: -1em;  /* counteract padding so cells don't appear above us */
+    background: #f4f4f4;  /* match dialog background */
+}
+table.level-browser thead tr th {
+    border-bottom: 2px solid hsl(var(--main-hue), 20%, 60%);
+}
+table.level-browser tfoot {
+    position: sticky;
+    bottom: -1em;
+    background: #f4f4f4;  /* match dialog background */
+}
+table.level-browser tfoot tr th {
+    border-top: 2px solid hsl(var(--main-hue), 20%, 60%);
+    text-align: right;
+}
+table.level-browser th,
+table.level-browser td {
+    padding: 0.25em;
+}
+table.level-browser td.-number {
+    color: #404040;
+    text-align: right;
+}
+table.level-browser th.-time,
+table.level-browser th.-score,
+table.level-browser td.-time,
+table.level-browser td.-score {
+    text-align: right;
+}
+table.level-browser button {
+    font-size: 0.833em;
+}
+table.level-browser tr.--current {
+    background: var(--generic-bg-selected-on-white);
+    outline: 1px solid var(--generic-border-selected-on-white);
+}
+table.level-browser tr.--unvisited {
+    color: #606060;
+    font-style: italic;
+}
+table.level-browser tr.--error {
+    color: #600000;
+    font-style: italic;
+}
+table.level-browser tbody tr {
+    cursor: pointer;
+}
+table.level-browser tbody tr:hover {
+    background: var(--generic-bg-hover-on-white);
+}
+table.level-browser tbody tr:nth-child(10n) td {
+    border-bottom: 2px solid hsl(var(--main-hue), 20%, 80%);
+}
+@media (max-width: 600px) {
+    /* Unique media query: this is only necessary for VERY narrow screens */
+    /* In order to wrap the rows, turn the table markup into a stack of grids */
+    table.level-browser {
+        display: block;
+    }
+    table.level-browser tr {
+        display: grid;
+        grid:
+            "number star    name    name    forget"
+            "number .       clock   time    score"
+            / 3em 1em 1fr 1fr 1fr
+        ;
+    }
+    table.level-browser td,
+    table.level-browser th {
+        display: block;
+    }
+    table.level-browser thead .-title,
+    table.level-browser tfoot .-title {
+        /* "Level" and "Total" column headers are not useful and eat a lot of space */
+        display: none;
+    }
+    table.level-browser thead th:empty,
+    table.level-browser tfoot th:empty {
+        /* These are filler for table layout purposes */
+        display: none;
+    }
+    table.level-browser .-number {
+        grid-area: number;
+    }
+    table.level-browser .-title {
+        grid-area: name;
+    }
+    table.level-browser .-time {
+        grid-area: clock;
+    }
+    table.level-browser .-time + .-time {
+        grid-area: time;
+    }
+    table.level-browser .-score {
+        grid-area: score;
+    }
+    table.level-browser .-aid {
+        grid-area: star;
+        /* We overflow a bit because of our padding, so just leak into it */
+        justify-self: center;
+    }
+    table.level-browser .-button {
+        grid-area: forget;
+        justify-self: end;
+    }
+    /* Move borders off cells and onto rows */
+    table.level-browser thead tr th {
+        border: none;
+    }
+    table.level-browser tfoot tr th {
+        border: none;
+    }
+    table.level-browser tbody tr:nth-child(10n) td {
+        border: none;
+    }
+    table.level-browser thead tr {
+        border-bottom: 2px solid hsl(var(--main-hue), 20%, 60%);
+    }
+    table.level-browser tfoot tr {
+        border-top: 2px solid hsl(var(--main-hue), 20%, 60%);
+    }
+    table.level-browser tbody tr {
+        border-bottom: 1px solid #ddd;
+    }
+    table.level-browser tbody tr.--current {
+        border: none;
+    }
+    table.level-browser tbody tr:nth-child(10n) {
+        border-bottom: 2px solid hsl(var(--main-hue), 20%, 80%);
+    }
+}
+
+/* Compat dialog */
+.dialog-compat {
+    max-width: 60em;
+}
+ul.compat-flags > li {
+    padding: 0.125em;
+}
+ul.compat-flags > li.-checked {
+    background: var(--generic-bg-selected-on-white);
+}
+ul.compat-flags > li:hover {
+    background: var(--generic-bg-hover-on-white);
+}
+ul.compat-flags > li > label {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+}
+ul.compat-flags > li > label > input[type=check] {
+    margin: 0.25em;
+}
+ul.compat-flags > li > label > span.-desc {
+    flex: 1;
+}
+img.compat-icon,
+.compat-icon-gap {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+}
+
+@media (max-width: 800px) {
+    /* Stack the formgrid, it doesn't fit very well as columns */
+    .dialog dl.formgrid {
+        display: block;
+    }
+    .dialog dl.formgrid > dt {
+        margin: 0.5em 0;
+        text-align: left;
+    }
+    .dialog dl.formgrid > dt:first-child {
+        margin-top: 0;
+    }
+    .dialog dl.formgrid > :is(dd, dt) + dt {
+        border-top: 1px solid #ccc;
+        padding-top: 0.5em;
+    }
+    .dialog dl.formgrid > * + dt:empty {
+        padding-top: 0;
+    }
+    .dialog dl.formgrid > dd {
+        margin: 0.5em 0;
+    }
+
+    .dialog-compat .radio-faux-button-set {
+        font-size: 0.83em;
+        flex-wrap: wrap;
+    }
+    .dialog-compat .radio-faux-button-set > * {
+        flex: 1 0 30%;
+    }
+    .dialog-compat .radio-faux-button-set .-button {
+        border-radius: 0;
+    }
+    ul.compat-flags img.compat-icon,
+    ul.compat-flags span.compat-icon-gap {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+
+/* Options dialog */
+.dialog-options {
+}
+.option-volume {
+    display: flex;
+    gap: 1em;
+}
+.option-volume > input[type=range] {
+    flex: auto;
+}
+table.option-tilesets th,
+table.option-tilesets td {
+    padding: 0.25rem 0.5rem;
+}
+table.option-tilesets > tr > .-format {
+    font-size: 0.75em;
+    text-align: center;
+}
+table.option-tilesets > tr > .-slot {
+    padding: 0;
+}
+table.option-tilesets > tr > .-slot > label {
+    display: grid;
+    box-sizing: border-box;
+    min-width: 100%;
+    min-height: 100%;
+    padding: 0.5em 1em;
+    place-items: center;
+}
+table.option-tilesets canvas {
+    vertical-align: middle;
+}
+label.option {
+    display: flex;
+    align-items: center;
+    padding: 0.25em;
+}
+label.option:hover {
+    outline: 2px solid #d0d0d0;
+}
+label.option .option-label {
+    flex: 1;
+}
+.option-help {
+    display: none;
+    background: #e8e8e8;
+    padding: 0.5em 0.75em;
+    border-radius: 0.5em;
+}
+.option-help.--visible {
+    /* TODO */
+}
+.dialog-options input[type=file][name=custom-tileset] {
+    display: none;
+}
+
+@media (max-width: 800px) {
+    .dialog {
+        max-width: 90%;
+        max-height: 90%;
+    }
+    .dialog-options {
+    }
+}
+
+
+/**************************************************************************************************/
+/* Main page structure */
+
+body > header {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+
+    padding: 0.25em 0.5em;
+    line-height: 1.125;
+}
+body > header h1 {
+    font-size: 1.66em;
+}
+body > header h2 {
+    font-size: 1.33em;
+}
+body > header h3 {
+    font-size: 1.75em;
+}
+body > header > nav {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+body > header button {
+    white-space: nowrap;
+}
+body > header h1 a {
+    color: inherit !important;
+    text-decoration: none !important;
+}
+
+body[data-mode=failed] #header-pack,
+body[data-mode=failed] #header-level,
+body[data-mode=failed] #header-main > nav,
+body[data-mode=loading] #header-pack,
+body[data-mode=loading] #header-level,
+body[data-mode=loading] #header-main > nav {
+    display: none;
+}
+body[data-mode=splash] #header-pack,
+body[data-mode=splash] #header-level {
+    display: none;
+}
+body[data-mode=editor] #player-edit,
+body[data-mode=player] #editor-play {
+    display: none;
+}
+#failed,
+#loading {
+    margin: auto;
+    text-align: center;
+}
+#failed .-with-error {
+    display: none;
+}
+#failed.--got-error .-with-error {
+    display: revert;
+}
+#loading {
+    font-size: 2em;
+}
+.scrolling-sidewalk {
+    height: 32px;
+    width: 50vw;
+    margin: auto;
+    background: url(icons/tool-bg-selected.png) repeat;
+    animation: scrolling-sidewalk linear 0.4s infinite;
+    --mask: linear-gradient(to right, transparent 0, #ffffff40 10%, white 20%, white 80%, #ffffff40 90%, transparent 100%);
+    -webkit-mask-image: var(--mask);
+    mask-image: var(--mask);
+}
+.scrolling-sidewalk > img {
+    display: block;
+    margin: auto;
+}
+@keyframes scrolling-sidewalk {
+    0% {
+        background-position: 0px 0px;
+    }
+    100% {
+        background-position: -32px 0px;
+    }
+}
+pre.stack-trace {
+    overflow: auto;
+    width: 90vw;
+    max-width: 50em;
+    padding: 0.5em;
+    margin: 1em auto;
+    white-space: pre;
+    text-align: left;
+    background: hsl(345, 20%, 10%);
+    border: 3px double hsl(345, 75%, 20%);
+}
+
+#header-main {
+    order: 3;
+    color: #606060;
+}
+#header-icon {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+#main-compat > img {
+    height: 16px;
+    vertical-align: middle;
+    margin-right: 0.25em;
+}
+
+@media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
+    body > header {
+        padding: 1px;
+    }
+    /* All these headings are way too big on phones */
+    body > header h1 {
+        font-size: 1.125em;
+    }
+    body > header h2 {
+        font-size: 1.125em;
+    }
+    body > header h3 {
+        font-size: 1.0625em;
+    }
+    body > header p {
+        /* "a game by eevee" takes up too much space :( */
+        display: none;
+    }
+
+    /* Hide the top/bottom nav while playing entirely */
+    body[data-mode=player] #header-pack,
+    body[data-mode=player] #header-level {
+        display: none;
+    }
+}
+
+/**************************************************************************************************/
+/* Splash (intro part) */
+
+#splash {
+    display: grid;
+    grid:
+        "header header"
+        "links  links"
+        "disclaimer disclaimer"
+        "stock  yours"
+        / 3fr minmax(18em, 1fr)
+    ;
+    gap: 1em;
+
+    position: relative;
+    padding: 1em 7.5%;
+    margin: auto 0;
+    overflow: auto;
+}
+#splash::after {
+    /* Force some breathing room at the bottom of the scroll */
+    content: '';
+    display: block;
+    height: 2em;
+}
+#splash > .drag-overlay {
+    display: none;
+    justify-content: center;
+    align-items: center;
+
+    font-size: 10vmin;
+    position: fixed;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    background: #0004;
+    border: 0.125rem dashed white;
+    border-radius: 0.25rem;
+    text-shadow: 0 1px 5px black;
+    text-align: center;
+}
+#splash > .drag-overlay::before {
+    content: "drop levels here";
+}
+#splash.--drag-hover > .drag-overlay {
+    display: flex;
+}
+
+#splash > header {
+    grid-area: header;
+    display: grid;
+    grid:
+        "image  title   fullscreen" 2fr
+        "image  tagline fullscreen" 1fr
+        / min-content 1fr min-content
+    ;
+    gap: 0 2em;
+
+    margin: auto;
+}
+#splash > header img {
+    grid-area: image;
+    align-self: center;
+}
+#splash > header h1 {
+    grid-area: title;
+    align-self: end;
+    font-size: 4em;
+    margin: 0;
+}
+#splash > header p {
+    grid-area: tagline;
+    align-self: start;
+    font-size: 1.5em;
+    margin: 0;
+    font-style: italic;
+    color: #909090;
+}
+#splash-fullscreen {
+    /* FIXME this makes the title SLIGHTLY offcenter bc of grid gap */
+    display: none;
+    grid-area: fullscreen;
+    align-self: center;
+}
+#splash-fullscreen svg {
+    width: 2em;
+    height: auto;
+}
+#splash h2 {
+    color: hsl(var(--main-hue), 40%, 90%);
+    text-shadow: 0 1px #000c;
+    background: hsl(var(--main-hue), 40%, 20%);
+    margin: -1rem -1rem 1rem;
+    padding: 0.5rem 1rem;
+}
+#splash * + h2 {
+    margin-top: 1rem;
+}
+#splash > section {
+    padding: 1em;
+    background: var(--panel-bg-color);
+    box-shadow: 0 0.25em 1em black;
+}
+#splash-links {
+    grid-area: links;
+    font-size: 1.5em;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 2em;
+}
+#splash > #splash-intro {
+    grid-area: intro;
+    font-size: 20px;
+}
+#splash > #splash-stock-levels {
+    grid-area: stock;
+}
+#splash > #splash-upload-levels {
+    grid-area: upload;
+}
+#splash-upload-file,
+#splash-upload-dir {
+    /* Hide the file upload control, which is ugly */
+    display: none;
+}
+#splash > #splash-your-levels {
+    grid-area: yours;
+}
+#splash > #splash-disclaimer {
+    grid-area: disclaimer;
+    font-size: 0.83em;
+    margin: 0;
+    text-align: center;
+    color: #c0c0c0;
+}
+
+@media (max-width: 800px) {
+    #splash {
+        /* Grid layout doesn't fit, just stack everything */
+        display: flex;
+        flex-direction: column;
+        gap: 0.5em;
+        /* 10% padding is way way too much */
+        padding: 0.5em;
+    }
+    #splash::after {
+        /* This needs different handling in a flex container */
+        flex: 0 0 0.5em;
+        height: auto;
+    }
+    /* Shrink logo and title, and left-align both */
+    #splash > header {
+        grid-template-rows: auto auto;
+        grid-template-columns: min-content 1fr;
+        column-gap: 0.5em;
+        margin: 0;
+    }
+    #splash > header img {
+        width: 48px;
+    }
+    #splash > header h1 {
+        font-size: 1.5em;
+    }
+    #splash > header p {
+        font-size: 0.9em;
+    }
+    /* No need to boost the font size here */
+    #splash > #splash-links {
+        font-size: inherit;
+        column-gap: 1em;
+    }
+    #splash > section {
+        padding: 0.5em;
+    }
+    /* This takes up an incredible amount of space on a phone; push it down, they have to scroll to
+     * see much of anything anyway.  TODO possibly revert if i can find a way to shorten wording */
+    #splash > #splash-disclaimer {
+        order: 99;
+    }
+}
+
+.played-pack-list {
+
+}
+#splash-stock-levels .played-pack-list {
+    display: grid;
+    grid: auto-flow auto / repeat(auto-fill, minmax(320px, 1fr));  /* 10x10 */
+    gap: 1em;
+    margin: 1em 0;
+}
+.played-pack-list .-preview {
+    display: block;
+    height: 320px;
+    margin: auto;
+    object-fit: none;
+}
+.played-pack-list > li > button {
+    font-size: 1.25em;
+    padding: 0.5em;
+    margin: 0.25em 0;
+    text-transform: none;
+    text-align: left;
+    /* this also forces the button to be 1 line of text high even for empty title */
+    white-space: pre-wrap;
+}
+.played-pack-list p {
+    color: #c0c0c0;
+    font-style: italic;
+}
+.played-pack-list .-progress {
+    isolation: isolate;  /* prevent the z-index on the levels bar from escaping */
+    display: grid;
+    grid:
+        "levels levels  levels"
+        "score  time    button"
+        / 2fr 2fr 1fr
+    ;
+    gap: 0.5em;
+    margin: 0.5em 0;
+    align-items: center;
+}
+.played-pack-list > li.--unplayed .-progress {
+    display: none;
+}
+.played-pack-list .-progress > .-levels {
+    grid-area: levels;
+
+    position: relative;
+    z-index: 1;
+    padding: 0.25em;
+    border: 1px solid hsl(var(--main-hue), 40%, 40%);
+    background: hsl(var(--main-hue), 30%, 5%);
+    box-shadow: 0 0 1px 1px #0009;
+    text-shadow: 0 1px 1px black;
+    text-align: center;
+}
+.played-pack-list .-progress > .-levels::before,
+.played-pack-list .-progress > .-levels::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    bottom: 0;
+    left: 0;
+}
+.played-pack-list .-progress > .-levels::before {
+    width: calc(var(--cleared) * 100%);
+    background: hsl(var(--main-hue), 50%, 25%);
+}
+.played-pack-list .-progress > .-levels::after {
+    width: calc(var(--aidless) * 100%);
+    background: hsl(var(--main-hue), 40%, 40%);
+}
+.played-pack-list .-progress > .-score {
+    grid-area: score;
+}
+.played-pack-list .-progress > .-time {
+    grid-area: time;
+}
+.played-pack-list .-progress > .-score::before {
+    content: "Score: ";
+}
+.played-pack-list .-progress > .-time::before {
+    content: "Time: ";
+}
+.played-pack-list .-progress > .-score::before,
+.played-pack-list .-progress > .-time::before {
+    color: hsl(var(--main-hue), 20%, 50%);
+}
+.played-pack-list .-editor-status {
+    display: flex;
+    gap: 0.5em;
+    margin: 0.5em 0 1em;
+}
+.played-pack-list .-editor-status > .-level-count {
+    flex: auto;
+}
+.played-pack-list .-editor-status > .-timestamp {
+    flex: auto;
+    text-align: right;
+}
+
+/* "Bulk test" button, only available in debug mode */
+#main-test-pack {
+    display: none;
+}
+body.--debug #main-test-pack {
+    display: initial;
+}
+.packtest-dialog {
+    width: 75vw;
+    height: 75vh;
+}
+ol.packtest-summary {
+    display: flex;
+    align-items: stretch;
+    height: 1em;
+    border: 1px solid #606060;
+}
+ol.packtest-summary > li {
+    /* Give a meaty flex-basis; the dialog has a max-width so it won't blow out, and these will
+     * simply shrink if necessary */
+    flex: 1 1 1em;
+    background: white;
+}
+.packtest-row {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+    margin: 0.5em 0;
+}
+.packtest-row > p {
+    flex: 9;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.packtest-row > button {
+    flex: 1;
+}
+.packtest-results {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+}
+.packtest-results th {
+    font-weight: normal;
+}
+.packtest-results tbody {
+    cursor: pointer;
+    border-top: 1px solid #0004;
+}
+.packtest-results tbody:hover {
+    outline: 2px solid #000;
+}
+.packtest-results td {
+    padding: 0.25em;
+}
+.packtest-results .-level {
+    text-align: left;
+}
+.packtest-results .-result {
+    width: 8em;
+    text-align: center;
+}
+.packtest-results .-clock {
+    width: 6em;
+    text-align: right;
+}
+.packtest-results .-delta {
+    width: 8em;
+    text-align: right;
+}
+.packtest-results .-speed {
+    width: 8em;
+    text-align: right;
+}
+.packtest-results canvas {
+    display: block;
+    margin: 0.5em auto;
+}
+.packtest-colorcoded [data-status=no-replay] {
+    background: hsl(0, 0%, 25%);
+}
+.packtest-colorcoded [data-status=running] {
+    background: hsl(30, 100%, 75%);
+}
+.packtest-colorcoded [data-status=success] {
+    background: hsl(120, 60%, 75%);
+}
+.packtest-colorcoded [data-status=early] {
+    background: hsl(75, 60%, 75%);
+}
+.packtest-colorcoded [data-status=failure] {
+    background: hsl(0, 60%, 60%);
+}
+.packtest-colorcoded [data-status=short] {
+    background: hsl(330, 60%, 75%);
+}
+.packtest-colorcoded [data-status=error] {
+    background: black;
+    color: white;
+}
+.packtest-dialog .grade-A {
+    color: hsl(120, 60%, 45%);
+    font-weight: bold;
+}
+.packtest-dialog .grade-B {
+    color: hsl(var(--main-hue), 60%, 45%);
+    font-weight: bold;
+}
+.packtest-dialog .grade-C {
+    color: hsl(270, 60%, 45%);
+    font-weight: bold;
+}
+.packtest-dialog .grade-D {
+    color: hsl(36, 60%, 60%);
+    font-weight: bold;
+}
+.packtest-dialog .grade-F {
+    color: hsl(0, 60%, 60%);
+    font-weight: bold;
+}
+
+
+/**************************************************************************************************/
+/* Player */
+
+#player {
+    flex: 1;
+    position: relative;
+    display: flex;
+
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+
+    --tile-width: 32px;
+    --tile-height: 32px;
+    --scale: 1;
+}
+#player-main {
+    /* This element basically just exists so that #player can have relative positioning and the
+     * debug panel can use that to sit against the right edge; absolute positioning excludes
+     * margins, so if it were positioned as a child of THIS element, it would be stuffed into the
+     * game area (oops!) */
+    /* It does also make auto-sizing easier! */
+    /* Default to a landscape layout, with the buttons on the left */
+    display: grid;
+    grid:
+        "buttons    game    actions"
+        "buttons    game    actions"
+        ".          music   music"
+        / 1fr auto 1fr
+    ;
+    justify-content: stretch;
+    gap: 0.5em;
+    margin: auto;  /* center in both directions baby */
+}
+#player-controls,
+#player-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25em;
+    line-height: 1;
+}
+#player-controls {
+    grid-area: buttons;
+    align-self: start;
+}
+#player-controls button,
+#player-actions button {
+    padding: 0.5em;
+}
+#player-controls button svg,
+#player-actions button svg {
+    font-size: 1.5em;
+    display: block;
+    margin: 0.125em auto;
+}
+#player-actions {
+    grid-area: actions;
+    align-self: end;
+}
+#player-music {
+    grid-area: music;
+    margin: 0 calc(var(--tile-width) * var(--scale) / 4);
+    text-transform: lowercase;
+    color: #909090;
+}
+/* Key hints are placed on the sides */
+#player button {
+    position: relative;
+}
+#player button .keyhint {
+    font-size: 1rem;
+    position: absolute;
+    top: 1.25em;
+    margin: auto;
+    color: #404040;
+}
+#player-controls button .keyhint {
+    left: -2em;
+}
+#player-actions button .keyhint {
+    right: -2em;
+}
+#player button:disabled .keyhint {
+    display: none;
+}
+#player-controls button:enabled.control-restart {
+    /* Special shenanigans for holding R to restart */
+    --restart-progress: 0;
+    background-image: var(--button-bg-gradient), conic-gradient(
+        hsl(345, 80%, 40%) 0deg calc(var(--restart-progress) * 360deg),
+        transparent calc(var(--restart-progress) * 360deg) 360deg)
+}
+@media (orientation: portrait) {
+    /* On a portrait screen, put the controls on top */
+    #player-main {
+        grid:
+            "buttons    actions"
+            "game       game"
+            "music      music"
+        ;
+    }
+    #player-controls,
+    #player-actions {
+        flex-direction: row;
+        white-space: nowrap;
+        line-height: 1.33;
+    }
+    #player-controls button svg,
+    #player-actions button svg {
+        font-size: 1em;
+    }
+    #player-controls button {
+        padding: 0.25em 0.5em;
+    }
+    #player-actions {
+        justify-content: end;
+    }
+    #player button .keyhint {
+        top: -2em;
+        left: 0;
+        right: 0;
+    }
+}
+@media (orientation: portrait) and (max-width: 800px) {
+    /* On a /small/ portrait screen, put the controls on their own bottom row */
+    #player-main {
+        grid:
+            "buttons"
+            "game"
+            "actions"
+        ;
+    }
+    #player-controls,
+    #player-actions {
+        /* Not much in these rows so make them a bit bigger for hittability */
+        font-size: 1.33em;
+        justify-content: center;
+    }
+    #player-controls button,
+    #player-actions button {
+        flex: auto;
+        padding: 0.25em 0.5em;
+    }
+    #player-controls .control-restart {
+        /* This is a dedicated pause-menu button */
+        display: none;
+    }
+    #player .keyhint {
+        /* Hide key hints; there's nowhere to put them and they take up surprisingly a lot of space */
+        display: none;
+    }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+    /* On a small landscape screen, remove the music row (it matters!) */
+    #player-main {
+        grid:
+            "buttons    game    actions"
+            "buttons    game    actions"
+            / 1fr auto 1fr
+        ;
+    }
+}
+@media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
+    #player-controls .-optional-label,
+    #player-actions .-optional-label {
+        display: none;
+    }
+    #splash-fullscreen {
+        display: revert;
+    }
+    #player-music {
+        /* TODO :( */
+        display: none;
+    }
+}
+
+#player-game-area {
+    grid-area: game;
+    /* don't stretch if the buttons or music blow out somehow */
+    justify-self: center;
+    align-self: center;
+
+    isolation: isolate;
+    display: grid;
+    align-items: center;
+    grid:
+        "level      chips"      min-content
+        "level      time"       min-content
+        "level      bonus"      min-content
+        "level      exits"      min-content
+        "level      rules"      1fr
+        "level      inventory"  min-content
+        /* Need explicit min-content to force the hint to wrap */
+        / min-content min-content
+    ;
+    column-gap: calc(var(--tile-width) * var(--scale) / 4);
+    row-gap: calc(var(--tile-height) * var(--scale) / 4);
+
+    padding: calc(var(--tile-height) * var(--scale) / 4) calc(var(--tile-width) * var(--scale) / 4);
+    background: hsl(var(--main-hue), 10%, 15%);
+    box-shadow: 0 0.25em 1em black;
+}
+
+.level {
+    grid-area: level;
+
+    position: relative;
+    outline: 1px solid hsl(var(--main-hue), 10%, 5%);
+}
+.level canvas {
+    display: block;
+    width: calc(var(--viewport-width) * var(--tile-width) * var(--scale));
+    height: calc(var(--viewport-height) * var(--tile-height) * var(--scale));
+    --viewport-width: 9;
+    --viewport-height: 9;
+}
+
+.player-overlay-message {
+    grid-area: level;
+    place-self: stretch;
+
+    position: relative;
+    display: grid;
+    grid:
+        "pack"      calc(1em * 1.25 * 1)
+        "level"     calc(1.333em * 1.25 * 2)
+        "author"    calc(1em * 1.25 * 1)
+        "space"     1fr
+        "score"     1.5em
+        "controls"  1.5em
+    ;
+    align-items: center;
+    gap: 0.25em;
+    /* Prevent blowout; force using the canvas's size */
+    height: 0;
+    min-height: 100%;
+    width: 0;
+    min-width: 100%;
+    box-sizing: border-box;
+
+    z-index: 2;
+    font-size: calc(0.5 * var(--tile-width) * var(--scale));
+    line-height: 1.25;
+    background: #0009;
+    color: white;
+    text-align: center;
+    text-shadow: 0 1px 1px black;
+}
+/* Allow clicking through the overlay in debug mode */
+body.--debug .player-overlay-message {
+    pointer-events: none;
+}
+.player-overlay-message > * {
+    padding: 0 0.25em;
+}
+.player-overlay-message h1 {
+    /* Pack title, doesn't need to be too big */
+    grid-area: pack;
+    font-size: 0.833em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: hsl(var(--main-hue), 25%, 75%);
+}
+.player-overlay-message > h2 {
+    grid-area: level;
+    font-size: 2em;
+}
+.player-overlay-message[data-reason='waiting'] > h2 {
+    /* For 'waiting' this is a level name, so make it two lines of smaller text */
+    font-size: 1.333em;
+}
+.player-overlay-message > h3 {
+    grid-area: author;
+    font-size: 1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: hsl(var(--main-hue), 10%, 90%);
+}
+.player-overlay-message > .-best-score {
+    grid-area: score;
+    align-self: flex-end;
+}
+.player-overlay-message > .scoreboard {
+    grid-row: author / score;
+}
+.player-overlay-message .-controls-hint {
+    grid-area: controls;
+    margin: 0;
+    font-size: 0.75em;
+    color: #c0c0c0;
+}
+@media (pointer: coarse), (pointer: none) {
+    .player-overlay-message .-controls-hint.--no-touch {
+        display: none;
+    }
+}
+@media (pointer: fine) {
+    .player-overlay-message .-controls-hint.--touch {
+        display: none;
+    }
+}
+.player-overlay-message .mobile-pause-menu {
+    grid-area: space;
+}
+.mobile-pause-menu {
+    font-size: 1.25em;
+    display: none;  /* flex */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.33em;
+    width: 80%;
+    margin: auto;
+}
+.mobile-pause-menu button {
+    padding: 0.33em;
+}
+.mobile-pause-menu > p {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: stretch;
+    margin: 0;
+    gap: 0.33em;
+}
+.mobile-pause-menu > p > button {
+    flex: 1;
+    line-height: 1;
+}
+.mobile-pause-menu > p > button.-narrow {
+    flex: initial;
+}
+.mobile-pause-menu .-only-waiting,
+.mobile-pause-menu .-only-paused,
+.mobile-pause-menu .-only-failure,
+.mobile-pause-menu .-only-success,
+.mobile-pause-menu .-only-ended {
+    display: none;
+}
+.player-overlay-message[data-reason=waiting] .mobile-pause-menu .-only-waiting,
+.player-overlay-message[data-reason=paused] .mobile-pause-menu .-only-paused,
+.player-overlay-message[data-reason=failure] .mobile-pause-menu .-only-failure,
+.player-overlay-message[data-reason=success] .mobile-pause-menu .-only-success,
+.player-overlay-message[data-reason=ended] .mobile-pause-menu .-only-ended {
+    display: initial;
+}
+.player-overlay-message[data-reason=paused] .mobile-pause-menu p.-only-paused {
+    display: flex;
+}
+.player-overlay-message[data-reason=""] {
+    display: none;
+}
+.player-overlay-message[data-reason=waiting] {
+    background: linear-gradient(to bottom, #000d, #0008 40%, #0008 60%, #000d);
+}
+.player-overlay-message[data-reason=failure] {
+    background: hsla(330, 20%, 10%, 0.5);
+    background: radial-gradient(hsla(330, 10%, 10%, 0.75) 40%, hsl(330, 20%, 10%));
+}
+.player-overlay-message[data-reason=success] {
+    background: radial-gradient(hsla(40, 80%, 10%, 0.75), hsla(40, 80%, 20%, 0.875) 80%, hsla(40, 80%, 30%, 0.875));
+}
+.player-overlay-message[data-reason=ended] {
+    /* Rearrange this entirely, to fit the ending image in */
+    grid:
+        "congrats"  min-content
+        "."         0.5em
+        "menu"      1fr
+        "."         0.5em
+        "score"     min-content
+    ;
+    overflow: hidden;
+    background: url(ending.png) no-repeat center center / cover;
+    box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(var(--main-hue), 50%, 25%);
+}
+.player-overlay-message[data-reason=ended] .mobile-pause-menu {
+    grid-area: menu;
+}
+.player-overlay-message[data-reason=ended] > .-congrats {
+    grid-area: congrats;
+    margin: 0;
+    padding: 0.25em;
+    background: #0009;
+}
+.player-overlay-message[data-reason=ended] > .-score {
+    grid-area: score;
+    margin: 0;
+    padding: 0.25em;
+    background: #0006;
+}
+.player-overlay-message[data-reason=ended] > .-score output {
+    font-size: 2em;
+    display: block;
+}
+@supports (mask-image: none) or (-webkit-mask-image: none) {
+    /* Do this complicated rotating sunburst thing only if masks work */
+    .player-overlay-message[data-reason=ended]::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        top: -50%;
+        bottom: -50%;
+        left: -50%;
+        right: -50%;
+        background: repeating-conic-gradient(at center, #fbf8ad 0turn 0.025turn, #f6d87e 0.025turn 0.075turn, #fbf8ad 0.075turn 0.1turn);
+        /* Alas, the spinning part apparently eats a lot of CPU */
+        /* animation: ending-spinner 10s linear infinite; */
+        -webkit-mask-image: radial-gradient(at center, #0000 0%, #000c 50%);
+        mask-image: radial-gradient(at center, #0000 0%, #000c 50%);
+    }
+}
+@keyframes ending-spinner {
+    0% {
+        transform: rotate(0turn);
+    }
+    100% {
+        transform: rotate(1turn);
+    }
+}
+.scoreboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+    grid-auto-rows: min-content;
+    align-items: center;
+    row-gap: 0.75em;
+    margin: auto 5%;
+    font-weight: normal;
+    text-align: center;
+    /* this is a lot of stuff crammed into a small space, so prefer having more space between rows
+     * and less space between labels+values (which makes them more clearly related anyway) */
+    line-height: 1.1;
+}
+.scoreboard .-subscore {
+    grid-column: span 2;
+    color: #f4f4f4;
+}
+.scoreboard .-level-score {
+    grid-column: span 3;
+}
+.scoreboard .-new-star {
+    color: hsl(45, 100%, 75%);
+}
+.scoreboard .-improvement {
+    grid-column: span 3;
+}
+.scoreboard .-improvement.--same h4 {
+    color: hsl(240, 50%, 60%);
+}
+.scoreboard .-improvement.--same p {
+    color: hsl(240, 50%, 80%);
+}
+.scoreboard .-improvement.--worse h4 {
+    color: hsl(330, 50%, 60%);
+}
+.scoreboard .-improvement.--worse p {
+    color: hsl(330, 50%, 80%);
+}
+.scoreboard .-improvement.--better h4 {
+    color: hsl(210, 50%, 60%);
+}
+.scoreboard .-improvement.--better p {
+    color: hsl(210, 50%, 80%);
+}
+.scoreboard .-total-score {
+    grid-column: span 3;
+    color: hsl(45, 100%, 75%);
+}
+.scoreboard h4 {
+    font-size: 0.75em;
+    color: hsl(var(--main-hue), 10%, 60%);
+}
+.scoreboard .-total-score h4 {
+    color: hsl(30, 50%, 60%);
+}
+.scoreboard p {
+    margin: 0;
+}
+.scoreboard .-total-score p {
+    font-size: 1.333em;
+}
+
+/* Transparent container for displaying captions for captions */
+.player-overlay-captions {
+    grid-area: level;
+    place-self: stretch;
+    position: relative;
+    /* above the message layer */
+    z-index: 3;
+
+    font-size: calc(0.75em * var(--scale));
+    pointer-events: none;
+}
+.player-overlay-captions > span.-caption {
+    position: absolute;
+    left: calc(var(--x-offset) * var(--tile-width) * var(--scale));
+    top: calc(var(--y-offset) * var(--tile-height) * var(--scale));
+    animation: 1s ease-in 1 forwards caption-fade;
+
+    font-weight: bold;
+    color: white;
+    /* Lol this sucks, please save me Tab */
+    /* TODO use an svg element for these instead?  would also avoid overflow issues */
+    text-shadow:
+        -1px -1px black,
+         1px -1px black,
+        -1px  2px black,
+         1px  2px black,
+         /* one more to fix lowercase k! */
+         1px  0   black;
+
+    white-space: nowrap;
+    /* Anchor these to their absolute centers */
+    transform: translate(-50%, -50%);
+}
+@keyframes caption-fade {
+    0% {
+        opacity: 1;
+    }
+    75% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+.player-level-number {
+    grid-area: number;
+    /* This is only for portrait, and mostly to fill space */
+    display: none;
+    line-height: 1;
+}
+.chips,
+.time,
+.bonus,
+.exits {
+    font-size: calc(var(--tile-height) * var(--scale) * 3/4);
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+}
+.chips {
+    grid-area: chips;
+}
+.time {
+    grid-area: time;
+}
+.bonus {
+    grid-area: bonus;
+}
+.exits {
+    grid-area: exits;
+    display: none;  /* hidden by default */
+}
+.chips h3,
+.time h3,
+.bonus h3,
+.exits h3 {
+    flex: 0;
+    order: 2;
+    font-size: 0.75em;
+    line-height: 1;
+    color: hsl(var(--main-hue), 20%, 80%);
+}
+.chips output,
+.time output,
+.bonus output,
+.exits output {
+    flex: 1;
+    min-width: 2em;
+    min-height: 1em;
+    line-height: 1;
+    text-align: right;
+    font-family: monospace;
+    color: hsl(var(--main-hue), 20%, 60%);
+}
+/* nb: the hex colors are all taken from the lexy palette */
+.chips output {
+    color: #feafc9;
+}
+.time output {
+    color: #6ca2a7;
+}
+.time output.--warning {
+    color: #fea46e;
+}
+.time output.--danger {
+    color: #f85f67;
+    /* TODO this can get out of sync and keeps going at 0, but is a neat idea */
+    /* animation: time-pulse 1s linear infinite; */
+}
+.time output {
+    color: #6ca2a7;
+}
+.exits output {
+    color: #ffe5b4;
+}
+@keyframes time-pulse {
+    0% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+.chips output.--done,
+.time output.--frozen,
+.bonus output {
+    color: hsl(var(--main-hue), 10%, 30%);
+}
+#player.--bonus-visible .bonus output {
+    color: #e2c9ff;
+}
+#player.--multiple-players .exits {
+    display: flex;
+}
+.player-rules {
+    font-size: calc(var(--tile-height) * var(--scale) / 4);
+    grid-area: rules;
+    align-self: end;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    color: hsl(var(--main-hue), 20%, 80%);
+}
+.player-rules p {
+    display: none;
+    margin: 0;
+}
+#player.--hide-logic .player-rules #player-rule-logic-hidden {
+    display: revert;
+}
+#player.--cc1-boots .player-rules #player-rule-cc1-boots {
+    display: revert;
+}
+
+/* This has a wrapper because scrollables don't work too well as the direct child of a grid or flex
+ * parent; they really want to expand to their natural size, and I do not want that */
+#player-game-area > .player-hint-wrapper {
+    grid-area: rules;
+    align-self: stretch;
+
+    display: none;
+    position: relative;
+    overflow: hidden;
+    font-size: calc(var(--tile-height) * var(--scale) / 3);
+    font-family: serif;
+    color: hsl(var(--main-hue), 20%, 80%);
+    background: url(#svg-icon-hint) hsl(var(--main-hue), 10%, 10%);
+    border: 3px double hsl(var(--main-hue), 10%, 15%);
+}
+#player-game-area > .player-hint-wrapper > .player-hint-bg-icon {
+    position: absolute;
+    width: 8em;
+    height: auto;
+    bottom: -2em;
+    right: -2em;
+    opacity: 0.05;
+    transform: rotate(-30deg);
+}
+#player-game-area > .player-hint-wrapper > .player-hint {
+    overflow: auto;
+    /* Set our inherent height or whatever to zero, but then force us to expand to whatever size our
+     * parent happens to be.  Magic! */
+    box-sizing: border-box;
+    height: 0;
+    min-height: 100%;
+    width: 0;
+    min-width: 100%;
+    padding: 0.5em;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+#player-game-area > .player-hint-wrapper.--visible {
+    display: initial;
+}
+
+#player .inventory {
+    grid-area: inventory;
+    justify-self: center;
+    display: grid;
+    grid: auto-flow calc(var(--tile-height) * var(--scale)) / repeat(4, calc(var(--tile-width) * var(--scale)));
+
+    background-size: calc(var(--tile-width) * var(--scale)) calc(var(--tile-height) * var(--scale));
+    width: calc(4 * var(--tile-width) * var(--scale));
+    height: calc(2 * var(--tile-height) * var(--scale));
+}
+#player .inventory img {
+    width: calc(var(--tile-width) * var(--scale));
+}
+#player .inventory .--hidden {
+    visibility: hidden;
+    pointer-events: none;
+}
+#player .inventory > span {
+    position: relative;
+}
+#player .inventory .-count {
+    font-size: calc(0.25 * var(--tile-height) * var(--scale));
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0.25em 0.5em;
+    margin: 0.25em;  /* 2px, for a 32px tileset */
+    line-height: 1;
+    border-radius: 0.25em;
+    background: #0009;
+    color: white;
+}
+
+@media (orientation: portrait) {
+    #player-game-area {
+        /* Rearrange the grid to be vertical */
+        grid:
+            "inventory   chips   chips   time" min-content
+            "inventory   rules   bonus   bonus" min-content
+            "level       level   level   level" min-content
+            / min-content 1fr 1fr 2fr
+        ;
+    }
+    .player-level-number {
+        /* TODO this makes us too big on my phone, damn */
+        /*display: initial;*/
+    }
+    .chips,
+    .time,
+    .bonus {
+        /* These numbers need to be sliiightly smaller */
+        font-size: calc(var(--tile-height) * var(--scale) * 2/3);
+    }
+    .exits {
+        /* Nowhere good to put this really */
+        display: none !important;
+    }
+    #player .inventory {
+        /* stick me in the center left */
+        place-self: center start;
+    }
+    #player-game-area > .player-hint-wrapper {
+        /* Overlay hints on the inventory area */
+        grid-row: chips / bonus;
+        grid-column: level;
+        z-index: 1;
+        font-size: calc(var(--tile-height) * var(--scale) / 2.5);
+    }
+    #player-game-area > .player-hint-wrapper > .player-hint {
+        padding: 0.33em 0.5em;
+        line-height: 1.33;
+    }
+    .player-rules {
+        align-self: center;
+        flex-direction: row;
+    }
+    .player-rules p span {
+        /* There's only room for the icons, since there's no dedicated hint space */
+        display: none;
+    }
+}
+@media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
+    /* Overlay is a bit different on a small screen, when the headers are missing */
+    .player-overlay-message[data-reason='waiting'] > p {
+        /* Hide the "Ready!" and controls, since there's a menu */
+        display: none;
+    }
+    .mobile-pause-menu {
+        display: flex;
+    }
+}
+@media (orientation: portrait) and (max-width: 800px) {
+    #player-game-area {
+        padding: 0;
+        background: none;
+        box-shadow: none;
+    }
+    .level {
+        outline: 1px solid black;
+    }
+}
+
+/* Debug stuff */
+body.--debug #player-debug {
+    display: flex;
+}
+#player-debug {
+    flex: none;
+    align-self: center;
+    display: none;
+    /* FIXME this blows out the height instead of scrolling and i cannot figure out how to make it
+     * stop, so here is an arbitrary max height on it which i extremely hate */
+    overflow: auto;
+    max-height: 75vh;
+    flex-direction: column;
+    justify-content: start;
+    gap: 0.25em;
+    padding: 0.5em;
+    background-image: repeating-linear-gradient(135deg,
+        hsl(0, 0%, 4%) 0px,
+        hsl(0, 0%, 4%) 16px,
+        hsl(30, 25%, 8%) 16px,
+        hsl(30, 25%, 8%) 32px);
+    border: 0.25em solid hsl(30, 75%, 50%);
+    border-right-width: 0;
+    box-shadow: inset 0 0 0.25em 0.25em #0004;
+}
+#player-debug > h3 {
+    margin: -0.25em -0.25em 0.25em;
+    padding: 0 0.5em;
+    background: hsl(30, 60%, 20%);
+    color: black;
+}
+#player-debug > * + h3 {
+    margin-top: 0.5em;
+}
+#player-debug hr {
+    border: none;
+    margin: 0.25em 10%;
+    border-bottom: 1px solid #404040;
+}
+#player-debug table.-time-controls {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 0.5em;
+}
+#player-debug table.-time-controls button {
+    width: 100%;
+    text-align: inherit;
+}
+#player-debug table.-time-controls td:nth-child(1) {
+    /* go backwards button */
+    text-align: left;
+}
+#player-debug table.-time-controls td:nth-child(2) {
+    /* value */
+    width: 4em;
+    text-align: right;
+}
+#player-debug table.-time-controls td:nth-child(3) {
+    /* label */
+}
+#player-debug table.-time-controls td:nth-child(4) {
+    /* go forward button */
+    text-align: right;
+}
+#player-debug .-inventory {
+    display: grid;
+    margin: 0 auto;
+    grid: auto-flow min-content / repeat(8, min-content);
+    gap: 2px;
+}
+#player-debug > .-inventory > button {
+    padding: 0;
+}
+#player-debug > .-inventory > button > img {
+    display: block;
+}
+#player-debug > .-inventory > button.-wide {
+    grid-column: span 3;
+    padding: 0.25em;
+}
+#player-debug .-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.25em;
+}
+#player-debug .-buttons button {
+    flex: auto;
+}
+
+#player-debug .-replay-columns {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+}
+#player-debug .-replay-columns .-buttons {
+    flex-direction: column;
+}
+#player-debug-input {
+    flex: none;
+    display: grid;
+    grid:
+        "drop   up      cycle"  1em
+        "left   .       right"  1em
+        ".      down    swap"   1em
+        / 1em 1em 1em
+    ;
+    gap: 0.5em;
+}
+#player-debug-input > svg {
+    fill: #404040;
+}
+#player-debug-input > svg.--held {
+    fill: white;
+}
+#player-debug > .-replay-available {
+    display: flex;
+    gap: 0.5em;
+}
+#player-debug > .-replay-available > h4 {
+    flex: 1 0 0;
+}
+#player-debug > .-replay-available > p {
+    flex: 2 0 0;
+    margin: 0;
+}
+#player-debug .-replay-status {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 4em;
+}
+#player-debug .-replay-status > .-none {
+}
+#player.--replay-playback #player-debug .-replay-status > .-none,
+#player.--replay-recording #player-debug .-replay-status > .-none {
+    display: none;
+}
+#player-debug .-replay-status > .-playback {
+    flex: 1;
+    display: none;
+    grid:
+        "duration   percent"    1em
+        "progress   progress"   0.5em
+        "button     button"     2em
+        / 3fr 1fr
+    ;
+    gap: 0.25em;
+    align-items: center;
+}
+#player.--replay-playback #player-debug .-replay-status > .-playback {
+    display: grid;
+}
+#player-debug .-replay-status > .-playback > progress {
+    grid-area: progress;
+    width: 100%;
+    height: 100%;
+}
+#player-debug .-replay-status > .-playback > output {
+    grid-area: percent;
+    min-width: 0;
+    text-align: right;
+}
+#player-debug .-replay-status > .-playback > span {
+    grid-area: duration;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#player-debug .-replay-status > .-playback > button {
+    grid-area: button;
+}
+#player-debug .-replay-status > .-recording {
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+#player.--replay-recording #player-debug .-replay-status > .-recording {
+    display: flex;
+}
+
+.player-debug-actor-tooltip {
+    position: absolute;
+    display: none;
+
+    /* similar to editor tooltip */
+    padding: 0.33em 0.75em;
+    border: 1px solid black;
+    color: #d8d8d8;
+    background: hsl(var(--main-hue), 10%, 20%);
+    box-shadow: 0 1px 2px 1px #0004;
+
+    opacity: 0.9;
+    font-family: monospace;
+    pointer-events: none;
+}
+.player-debug-actor-tooltip.--visible {
+    display: block;
+}
+.player-debug-actor-tooltip h3 {
+    font-size: 1.25em;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid currentColor;
+    color: white;
+}
+.player-debug-actor-tooltip dl {
+    display: grid;
+    grid: auto-flow min-content / auto auto;
+    align-items: baseline;
+    gap: 0.25em 1em;
+    margin: 0;
+}
+.player-debug-actor-tooltip dl > dt {
+    grid-column: 1;
+}
+.player-debug-actor-tooltip dl > dd {
+    grid-column: 2;
+    margin: 0;
+}
+
+
+/**************************************************************************************************/
+/* Editor */
+
+#editor {
+    flex: 1 1 auto;
+    display: grid;
+    grid:
+        "controls   controls    controls"   min-content
+        "palette    level       tools"      1fr
+        "palette    status      tools"      min-content
+        / min-content 1fr min-content
+    ;
+    gap: 0.5em;
+
+    min-height: 0;
+    margin: auto 1em;
+}
+
+#editor .editor-canvas {
+    grid-area: level;
+    overflow: auto;
+    position: relative;
+    background: #101010;
+    border: 0.125em solid black;
+}
+#editor .editor-canvas::before {
+    /* Clever abuse of sticky positioning to draw a box shadow on top of the container and inside
+     * the scrollbars (thanks, leafo!) */
+    content: '';
+    display: block;
+    position: sticky;
+    top: 0;
+    left: 0;
+    height: 100%;
+    box-shadow: inset 0 0 0.5em black;
+    z-index: 1;
+    pointer-events: none;
+}
+#editor .editor-canvas.--crispy {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+#editor .editor-canvas .-container {
+    /* The shadow overlay is sticky-positioned, meaning it defaults to being in-flow, so this
+     * container needs to compensate by absolutely positioning itself back up top.  It'll still
+     * create scrollbars, so this shouldn't cause any issues. */
+    position: absolute;
+    top: 0;
+    margin: auto;
+    /* Give the canvas/overlay a bit of a margin; it has to be a border because, due to some quirk
+     * of overflowing flexboxes I guess, padding and margins won't extend the scroll area on the
+     * right and bottom.  It's 75vmin because that /ROUGHLY/ allows panning the level to the edge of
+     * the viewport but not completely off of it. */
+    /* NOTE: This MUST be large enough to guarantee being bigger than the viewport; we aren't in a
+     * flex container, so if the canvas + border aren't sufficiently tall, we won't even fill the
+     * viewport and the canvas will be off-center.  Also, with no border at all, a mysterious
+     * interaction with the sticky box-shadow causes the top of the canvas to go off the top of the
+     * viewport entirely!  So, twiddle this with care. */
+    /* TODO probably a better way to measure this; i really want relative to parent size, but
+     * percentage padding and margins are specifically relative to our width */
+    border: 50vmax solid transparent;
+    /* This is necessary to force us to be as wide as the canvas; without it, we have an auto width,
+     * and there's technically no space left after our border, so we become zero width and the
+     * canvas is entirely overflow, which fucks up positioning of the SVG overlay */
+    width: -moz-fit-content;
+    width: fit-content;
+}
+#editor .editor-canvas canvas.editor-renderer-canvas {
+    display: block;
+    width: calc(var(--viewport-width) * var(--tile-width) * var(--scale));
+    --viewport-width: 9;
+    --viewport-height: 9;
+    --scale: 1;
+}
+/* SVG overlays */
+svg.level-editor-overlay {
+    position: absolute;
+    inset: calc(-1 * var(--tile-width) * var(--scale)) calc(-1 * var(--tile-height) * var(--scale));
+    /* allow clicks to go through us! */
+    pointer-events: none;
+
+    /* not used to shrink us (absolute positioning does that), just to make the stroke width a
+     * consistent size at any zoom level */
+    --scale: 1;
+    /* default svg properties */
+    --stroke-width: calc(0.125 / var(--scale));
+    stroke-width: calc(1px * var(--stroke-width));
+    fill: none;
+}
+svg.level-editor-overlay .overlay-transient {
+    display: none;
+}
+svg.level-editor-overlay .overlay-transient.--visible {
+    display: initial;
+}
+svg.level-editor-overlay rect.overlay-pencil-cursor {
+    stroke: hsla(var(--main-hue), 80%, 40%, 0.9);
+    fill: hsla(var(--main-hue), 100%, 75%, 0.25);
+    /* Automatically scale the cursor up just enough that the outline appears outside the cell,
+     * rather than straddling it */
+    transform: scale(calc(100% * (1 + var(--stroke-width))));
+    transform-origin: 0.5px 0.5px;
+}
+svg.level-editor-overlay rect.overlay-pending-selection {
+    stroke: hsla(var(--selected-hue), 100%, 60%, 0.5);
+    fill: hsla(var(--selected-hue), 100%, 75%, 0.25);
+}
+svg.level-editor-overlay path.overlay-selection-background {
+    stroke: hsla(var(--selected-hue), 10%, 90%, 0.9);
+    fill: none;
+    pointer-events: none;
+}
+svg.level-editor-overlay path.overlay-selection {
+    stroke: hsla(var(--selected-hue), 10%, 10%, 0.75);
+    fill: hsla(var(--selected-hue), 50%, 75%, 0.375);
+    fill-rule: evenodd;
+    stroke-width: calc(0.125px / var(--scale));
+    stroke-dasharray: calc(0.125px / var(--scale)), calc(0.125px / var(--scale));
+    animation: marching-ants 0.5s linear infinite;
+    pointer-events: auto;
+    cursor: move;
+}
+svg.level-editor-overlay path.overlay-selection.--floating {
+    stroke: hsla(var(--selected-hue), 80%, 50%, 0.75);
+}
+@keyframes marching-ants {
+    0% {
+        stroke-dashoffset: calc(0.25px / var(--scale));
+    }
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+#overlay-arrowhead {
+    fill: white;
+    fill: context-stroke;
+}
+svg.level-editor-overlay g.overlay-connection {
+    stroke: #e4e4e4;
+    filter: url(#overlay-filter-outline);
+}
+svg.level-editor-overlay g.overlay-connection.--cursor {
+    stroke: hsl(90, 90%, 40%);
+}
+svg.level-editor-overlay g.overlay-connection[data-source=button_red] {
+    stroke: hsl(0, 90%, 60%);
+}
+svg.level-editor-overlay g.overlay-connection[data-source=button_brown] {
+    stroke: hsl(50, 90%, 50%);
+}
+svg.level-editor-overlay g.overlay-connection[data-source=button_orange] {
+    stroke: hsl(30, 90%, 60%);
+}
+svg.level-editor-overlay g.overlay-connection.--implicit line.-arrow {
+    stroke-dasharray: calc(0.25px / var(--scale)), calc(0.25px / var(--scale));
+}
+svg.level-editor-overlay g.overlay-connection line.-arrow {
+    marker-end: url(#overlay-arrowhead);
+}
+svg.level-editor-overlay g.overlay-circuitry {
+    filter: url(#overlay-filter-outline);
+    opacity: 0.75;
+}
+svg.level-editor-overlay .overlay-circuit-wires {
+    stroke: hsl(180, 100%, 50%);
+    stroke-linecap: square;  /* so a corner meets nicely in the middle of a tile */
+}
+svg.level-editor-overlay .overlay-circuit-tunnels {
+    stroke: hsl(180, 100%, 50%);
+    stroke-dasharray: 0.0625, 0.0625;
+}
+svg.level-editor-overlay circle.overlay-circuit-input {
+    stroke: hsl(180, 100%, 50%);
+    fill: hsl(180, 100%, 10%);
+}
+svg.level-editor-overlay circle.overlay-circuit-output {
+    stroke: hsl(180, 100%, 50%);
+    fill: hsl(180, 100%, 50%);
+}
+svg.level-editor-overlay .overlay-adjust-cursor {
+    /* shared between rotate+adjust tools, though they use different elements/shapes */
+    stroke: #444;
+    fill: #fff4;
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=terrain] {
+    stroke: hsl(150deg, 80%, 20%, 0.8);
+    fill: hsl(150deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=item] {
+    stroke: hsl(50deg, 80%, 20%, 0.8);
+    fill: hsl(50deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=item-mod] {
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=actor] {
+    stroke: hsl(215deg, 80%, 20%, 0.8);
+    fill: hsl(215deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=swivel] {
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=thin-wall] {
+    stroke: hsl(330deg, 80%, 20%, 0.8);
+    fill: hsl(330deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-gray-button-radius {
+    stroke: #f4f4f4;
+    fill: hsla(10, 10%, 80%, 0.125);
+}
+svg.level-editor-overlay .overlay-adjust-gray-button-shroud {
+    stroke: none;
+    fill: hsla(10, 10%, 30%, 0.6);
+}
+svg.level-editor-overlay rect.overlay-camera {
+    stroke: #808080;
+    fill: #80808040;
+    pointer-events: auto;
+}
+svg.level-editor-overlay text {
+    /* Each cell is one "pixel", so text needs to be real small */
+    font-size: 1px;
+}
+svg.level-editor-overlay text.overlay-edit-tip {
+    /* Used for showing e.g. the size of a pending selection.  Centered around its anchor */
+    stroke: none;
+    fill: hsl(var(--selected-hue), 80%, 30%);
+    text-anchor: middle;
+    dominant-baseline: middle;
+}
+svg.level-editor-overlay text.overlay-adjust-hint {
+    font-size: calc(0.5px / var(--scale));
+    font-weight: bold;
+    stroke: black;
+    fill: white;
+    paint-order: stroke;
+    text-anchor: middle;
+    dominant-baseline: auto;
+}
+svg.level-editor-overlay .overlay-text-cursor {
+    stroke: hsla(50, 90%, 60%, 0.75);
+    fill: hsla(50, 90%, 60%, 0.25);
+}
+
+.editor-big-tooltip {
+    /* shared between toolbar and palette tooltips */
+    opacity: 0;
+    visibility: hidden;
+    z-index: 1;
+    position: absolute;
+    padding: 0.33em 0.75em;
+    pointer-events: none;
+
+    transition-property: margin, opacity, visibility;
+    transition-timing-function: ease-out;
+    transition-duration: 0.125s, 0.125s, 0s;
+    transition-delay: 0s, 0s, 0.125s;
+
+    border: 1px solid black;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    text-transform: none;
+    text-align: left;
+    color: #d8d8d8;
+    background: hsl(var(--main-hue), 10%, 20%);
+    box-shadow: 0 1px 2px 1px #0004;
+}
+.editor-big-tooltip h3 {
+    font-size: 1.25em;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid currentColor;
+    color: white;
+}
+.editor-big-tooltip kbd {
+    font-size: 0.75em;
+    display: inline-block;
+    margin-right: 0.25rem;
+    padding: 1px 2px;
+    border: 1px solid #d8d8d8;
+    border-bottom-width: 2px;
+    border-radius: 2px;
+    line-height: 1;
+    vertical-align: 0.25em;
+    background: #d8d8d8;
+    box-shadow: 0 2px #999;
+    color: hsl(var(--main-hue), 10%, 20%);
+    letter-spacing: -1px;
+    text-transform: lowercase;
+}
+.editor-big-tooltip svg {
+    width: 1.5em;
+    height: 1.5em;
+    margin: 0 -0.25em;  /* these are mouse buttons; shave off some of the extra space */
+    vertical-align: -0.375em;
+}
+#editor .-menubar {
+    /* TODO with the hint area gone i don't think this needs to be a grid?  could just flex */
+    grid-area: controls;
+    display: grid;
+    grid:
+        "tile   toolbar    layer   direction   .       menu" auto
+        / auto auto auto auto 1fr auto
+    ;
+    align-items: center;
+    column-gap: 1em;
+}
+#editor .-menubar .editor-tile-controls {
+    grid-area: tile;
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+}
+#editor .-menubar #editor-fg-tile canvas {
+    display: block;
+}
+#editor .-menubar .-buttons {
+    grid-area: menu;
+}
+#editor .-menubar .-toolbar-section {
+    padding: 2px;
+    border-radius: 4px;
+    background: hsl(var(--selected-hue), 10%, 10%);
+    border: 1px solid hsl(var(--selected-hue), 10%, 20%);
+}
+#editor .-tools {
+    grid-area: tools;
+    /* cheap separation of tools and layer selector */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em;
+}
+/* hint stuff */
+#editor .-tools button {
+    position: relative;
+}
+#editor .-tools .-help {
+    position: absolute;
+    top: 0;
+    right: 100%;
+    width: max-content;
+}
+#editor .-tools #editor-layer-selector .-help {
+    top: auto;
+    bottom: 0;
+}
+#editor .-tools button:hover .-help {
+    opacity: 1;
+    z-index: 2;  /* show above any that are in mid-fade */
+    visibility: visible;
+    margin-right: 1em;
+    transition-delay: 0.5s;
+    transition-timing-function: ease-in;
+}
+/* layer selector */
+#editor-layer-selector {
+    display: flex;
+    flex-direction: column-reverse;  /* put terrain layer on bottom */
+}
+#editor-layer-selector .--disabled img {
+    filter: grayscale(100%);
+    opacity: 0.333;
+}
+/* both the tools list and the layer selector */
+.icon-button-set {
+    display: flex;
+    flex-wrap: wrap;
+}
+.icon-button-set button {
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    line-height: 1;
+    background: none;
+    border: none;
+    border-radius: 2px;
+    box-shadow: none;
+}
+.icon-button-set button:hover {
+    background: hsl(var(--hover-hue), 50%, 40%);
+}
+.icon-button-set button.-selected {
+    background: hsl(var(--selected-hue), 90%, 75%);
+}
+.icon-button-set button img {
+    display: block;
+}
+@media (max-height: 1000px) {
+    /* This sucks but I can't find a better solution: if the window is rather short (at normal zoom
+     * and using my fonts and a reasonable width...), put the tools on two rows */
+    #editor-toolbar {
+        display: grid;
+        grid: auto-flow / repeat(2, min-content);
+    }
+}
+
+#editor .-palette {
+    isolation: isolate;
+    grid-area: palette;
+    width: calc(32px * 8 + 4px * 9);
+    padding-right: 1em;  /* make room for scrollbar so we don't get a horizontal one */
+    /* TODO when there IS a scrollbar, the h2s are slightly narrower.  think this is an
+     * unexpected consequence of using min-content, which i guess does not take the
+     * possibility of a scrollbar into account */
+    overflow-y: auto;
+}
+#editor .-palette h2 {
+    font-size: 1em;
+    margin-top: 1em;
+    border-bottom: 1px solid currentColor;
+    color: #909090;
+}
+#editor .-palette h2:first-child {
+    margin-top: 0;
+}
+#editor .-palette section {
+    display: grid;
+    margin: 0.33em 4px;  /* matches gap */
+    grid: auto-flow 32px / repeat(8, 32px);
+    gap: 4px;
+}
+.palette-entry {
+}
+.palette-entry:hover {
+    box-shadow: 0 0 0 1px black, 0 0 0 3px hsl(var(--main-hue), 100%, 75%);
+}
+.palette-entry.--selected {
+    z-index: 1;
+    box-shadow: 0 0 0 1px black, 0 0 0 3px white;
+}
+.editor-palette-tooltip {
+    width: 20em;
+
+    /* Don't immediately hide me when mousing between entries */
+    /* FIXME if it's in mid-fade and you mouse over an entry again, it stays frozen in mid-fade
+     * for 0.5s  :( */
+    transition-delay: 0.5s, 0.5s, 0.625s;
+}
+.editor-palette-tooltip.--visible {
+    opacity: 1;
+    z-index: 2;  /* show above any that are in mid-fade */
+    visibility: visible;
+    margin-left: 1em;
+    transition-delay: 0.5s;
+    transition-timing-function: ease-in;
+}
+#editor #editor-statusbar {
+    grid-area: status;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    /* Try very hard to minimize reflow, since this is updated frequently */
+    height: 1.25em;
+    line-height: 1.25;
+    overflow: hidden;
+}
+#editor #editor-statusbar > .-zoom {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    width: 11.5em;
+}
+#editor #editor-statusbar > .-zoom > input {
+    width: 6em;
+    margin: 0;
+}
+#editor #editor-statusbar > .-zoom > output {
+    width: 4em;
+}
+#editor #editor-statusbar > .-cursor {
+    width: 5em;
+}
+
+.editor-level-browser {
+    display: grid;
+    grid: auto-flow auto / repeat(auto-fill, minmax(13em, 1fr));  /* 12em preview width + padding */
+    gap: 0.5em;
+    width: 70vw;
+    /* seems to go into the parent's right padding fsr, i guess because the scrollbar is there */
+    margin-right: 1em;
+    list-style: none;
+}
+.editor-level-browser li {
+    display: grid;
+    grid:
+        "preview    preview"
+        "number     title"
+        / min-content 1fr
+    ;
+    gap: 0.25em;
+    padding: 0.5em;
+}
+.editor-level-browser li.--selected {
+    background: var(--generic-bg-selected-on-white);
+    outline: 1px solid var(--generic-border-selected-on-white);
+}
+.editor-level-browser li:hover {
+    background: var(--generic-bg-hover-on-white);
+}
+.editor-level-browser li > .-preview {
+    grid-area: preview;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12em;
+    height: 12em;
+    margin: auto;
+}
+.editor-level-browser li > .-preview:empty::before {
+    content: '···';
+    display: block;
+    font-size: 5em;
+    color: #c0c0c0;
+}
+.editor-level-browser li > .-preview canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+}
+.editor-level-browser li > .-number {
+    grid-area: number;
+    font-size: 2em;
+}
+.editor-level-browser li > .-title {
+    grid-area: title;
+    align-self: center;
+}
+
+/* Mini editors for specific tiles with complex properties */
+/* FIXME should this stuff be on an overlay container class? */
+@keyframes balloon-appear {
+    0% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+.overlay > .--balloon {
+    animation: balloon-appear ease-in 0.1s 1;
+}
+.overlay > .--balloon.--vanishing {
+    animation-direction: reverse;
+}
+form.editor-popup-tile-editor {
+    position: relative;
+    padding: 0.75em;
+    color: black;
+    background: white;
+    border: 1px solid black;
+    box-shadow: 0 2px 4px #0004;
+
+    margin-top: 1em;
+
+    --chevron-offset: 0px;
+}
+form.editor-popup-tile-editor.--above {
+    margin-top: -1em;
+}
+form.editor-popup-tile-editor h3 {
+    margin-bottom: 0.25em;
+    border-bottom: 1px dotted #606060;
+}
+form.editor-popup-tile-editor * + h3 {
+    margin-top: 0.25em;
+}
+/* Use ::before for a chevron pointing at the tile in question */
+form.editor-popup-tile-editor::before {
+    content: '';
+    display: block;
+    position: absolute;
+    border: 0.75em solid transparent;
+    left: var(--chevron-offset);
+    margin-left: -0.75em;
+
+    top: -0.75em;
+    border-top: none;
+    border-bottom-color: white;
+    filter: drop-shadow(0 -1px 0 black);
+}
+form.editor-popup-tile-editor.--above::before {
+    top: auto;
+    bottom: -0.75em;
+    border: 0.75em solid transparent;
+    border-bottom: none;
+    border-top-color: white;
+    filter: drop-shadow(0 1px 0 black);
+}
+/* Letter floor tiles, which let you pick the character to use; show them as a grid.  Note the
+ * characters are preceded by radio buttons, which we hide for simplicity */
+ol.editor-letter-tile-picker {
+    display: grid;
+    grid: auto-flow 1.5em / repeat(17, 1.5em);
+    text-align: center;
+    font-family: monospace;
+}
+ol.editor-letter-tile-picker label,
+ol.editor-letter-tile-picker .-glyph {
+    display: block;
+    height: 100%;
+}
+ol.editor-letter-tile-picker input[type=radio] {
+    display: none;
+}
+ol.editor-letter-tile-picker input[type=radio]:checked + .-glyph {
+    background: hsl(var(--main-hue), 75%, 90%);
+    outline: 2px solid hsl(var(--main-hue), 75%, 80%);
+}
+/* Hint tiles accept prose */
+textarea.editor-hint-tile-text {
+    font-size: 1.5em;
+    width: 20vw;
+    height: 20vh;
+    min-width: 15rem;
+    min-height: 5rem;
+    border: none;
+    font-family: serif;
+}
+/* Class for a list that uses hidden inputs with svg icons, shared by directional blocks and
+ * railroad tracks */
+.editor-tile-editor-svg-parts input {
+    display: none;
+}
+.editor-tile-editor-svg-parts svg {
+    display: block;
+    width: 3em;
+    fill: none;
+    stroke: #c0c0c0;
+    stroke-width: 2;
+}
+.editor-tile-editor-svg-parts input:checked + svg {
+    stroke: hsl(var(--main-hue), 90%, 50%);
+}
+/* Directional blocks have arrows */
+ol.editor-directional-block-tile-arrows {
+    display: grid;
+    grid: auto-flow 3em / repeat(3, 3em);
+}
+/* Thin walls have edges */
+ol.editor-thin-wall-edges {
+    position: relative;
+    --size: 5em;
+    --gap: 0.25em;
+    --breadth: 2em;
+    width: calc(var(--size) + 2 * var(--gap) + 2 * var(--breadth));
+    height: calc(var(--size) + 2 * var(--gap) + 2 * var(--breadth));
+}
+ol.editor-thin-wall-edges input {
+    display: none;
+}
+ol.editor-thin-wall-edges input:checked + .-edge {
+    --visible-color: hsl(var(--main-hue), 90%, 50%);
+}
+ol.editor-thin-wall-edges label .-edge {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: var(--breadth) solid transparent;
+    --visible-color: #c0c0c0;
+}
+ol.editor-thin-wall-edges label[data-edge=north] .-edge {
+    top: 0;
+    left: var(--gap);
+    width: var(--size);
+    border-bottom-width: 0;
+    border-top-color: var(--visible-color);
+}
+ol.editor-thin-wall-edges label[data-edge=south] .-edge {
+    bottom: 0;
+    left: var(--gap);
+    width: var(--size);
+    border-top-width: 0;
+    border-bottom-color: var(--visible-color);
+}
+ol.editor-thin-wall-edges label[data-edge=west] .-edge {
+    left: 0;
+    top: var(--gap);
+    height: var(--size);
+    border-right-width: 0;
+    border-left-color: var(--visible-color);
+}
+ol.editor-thin-wall-edges label[data-edge=east] .-edge {
+    right: 0;
+    top: var(--gap);
+    height: var(--size);
+    border-left-width: 0;
+    border-right-color: var(--visible-color);
+}
+/* Railroad tracks are...  complicated */
+ul.editor-railroad-tile-tracks {
+    display: grid;
+    grid: auto-flow 3em / repeat(3, 3em);
+    gap: 0.25em;
+}
+ul.editor-railroad-tile-tracks.--switch input:checked + svg {
+    stroke: hsl(15, 90%, 50%);
+}
+/* Cells are their own thing */
+form.editor-popup-tile-editor .-instructions {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 0.5em;
+    color: #999;
+    font-style: italic;
+}
+form.editor-popup-tile-editor .-instructions p {
+    margin: 0;
+}
+form.editor-popup-tile-editor .-instructions :nth-child(2) {
+    text-align: right;
+}
+ul.editor-popup-cell-contents {
+    display: flex;
+    flex-direction: row;
+    gap: 0.25em;
+}
+ul.editor-popup-cell-contents li {
+    padding: 2px;
+    background: #eee;
+}
+ul.editor-popup-cell-contents li.--editable {
+    background: hsl(300, 60%, 90%);
+}
+ul.editor-popup-cell-contents li canvas {
+    display: block;
+}

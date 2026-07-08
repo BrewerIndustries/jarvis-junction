@@ -1,0 +1,4 @@
+*.dac
+.DS_Store
+# macOS Finder duplicate copies (e.g. "index 2.html")
+* [0-9].*
