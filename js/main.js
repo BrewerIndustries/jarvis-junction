@@ -15,6 +15,7 @@ import SOUNDTRACK from './soundtrack.js';
 import { Tileset, TILESET_LAYOUTS, convert_tileset_to_layout, parse_tile_world_large_tileset, infer_tileset_from_image } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, mk_svg } from './util.js';
+import { EffectsLayer, screen_shake, haptic } from './juice.js';
 
 // Directional actions get "last-pressed-wins" override handling in get_input():
 // holding one direction then pressing another moves in the newer one, and
@@ -480,6 +481,12 @@ class SFXPlayer {
     }
 
     play_once(name, cell = null) {
+        // Cosmetic juice hook — fires for every event regardless of whether sound
+        // is enabled/loaded, so particles/shake/haptics work even when muted.
+        if (this.on_event) {
+            this.on_event(name, cell);
+        }
+
         if (! this.enabled)
             return;
 
@@ -1040,6 +1047,83 @@ class Player extends PrimaryView {
         // TODO yet another thing that should be in setup, but can't be because load_level is called
         // first
         this.sfx_player = new SFXPlayer(this.place_caption.bind(this));
+
+        // Game-feel juice: a particle overlay over the board, driven off sfx events.
+        // Purely cosmetic — never touches the simulation.
+        this.game_area_el = this.root.querySelector('#player-game-area');
+        this.effects = new EffectsLayer(this.game_area_el);
+        this.sfx_player.on_event = (name, cell) => this._juice_event(name, cell);
+    }
+
+    // Translate a game event (from the sfx hook) into cosmetic flourish: particle
+    // bursts at the affected tile, screen shake, and haptics.  Non-deterministic.
+    _juice_event(name, cell) {
+        // Where on screen is the tile?  (client coords; the burst converts to local)
+        let center = null;
+        if (cell && cell.x !== undefined && this.renderer && this.renderer.canvas.isConnected) {
+            let r = this.renderer.get_cell_rect(cell.x, cell.y);
+            center = [r.x + r.width / 2, r.y + r.height / 2];
+        }
+        let burst = (opts) => {
+            if (center) this.effects.burst(center[0], center[1], opts);
+        };
+
+        switch (name) {
+            case 'get-chip':
+            case 'get-chip-extra':
+                burst({ count: 9, colors: ['#e8c46a', '#f4e2a6', '#c8a24a'], rise: 30 });
+                haptic(8);
+                break;
+            case 'get-chip-last':
+                // Last chore done — the door's about to open; a bigger flourish.
+                burst({ count: 18, colors: ['#f4e2a6', '#e8c46a', '#ffffff'], speed: 130, rise: 40 });
+                haptic([12, 20, 12]);
+                break;
+            case 'get-key':
+                burst({ count: 10, colors: ['#c8a24a', '#f4e2a6', '#8fd0e8'], rise: 30 });
+                haptic(8);
+                break;
+            case 'get-tool':
+            case 'get-bonus':
+            case 'get-stopwatch-bonus':
+                burst({ count: 10, colors: ['#a6e3c0', '#f4e2a6', '#e8c46a'], rise: 30 });
+                haptic(10);
+                break;
+            case 'socket':
+                // The front door yields.
+                burst({ count: 20, colors: ['#f4e2a6', '#e8c46a', '#ffffff'], speed: 140, spread: Math.PI * 2, dir: 0, rise: 0, square: true });
+                screen_shake(this.game_area_el, 'sm');
+                haptic([10, 30, 10]);
+                break;
+            case 'exit':
+            case 'win':
+                // Duty complete — a celebratory shower from the doorway.
+                burst({
+                    count: 32, square: true, life: 0.9, gravity: 320, speed: 190,
+                    spread: Math.PI, dir: -Math.PI / 2, rise: 70,
+                    colors: ['#f4e2a6', '#e8c46a', '#c8a24a', '#a6e3c0', '#ffffff'],
+                });
+                haptic([15, 40, 15, 40, 30]);
+                break;
+            case 'bomb':
+                burst({ count: 22, colors: ['#ff8a3d', '#ffd15a', '#e0e0e0'], speed: 170, spread: Math.PI * 2, dir: 0 });
+                screen_shake(this.game_area_el, 'lg');
+                haptic([30, 40, 20]);
+                break;
+            case 'lose':
+                screen_shake(this.game_area_el, 'md');
+                haptic([40, 60, 40]);
+                break;
+            case 'splash':
+            case 'splash-slime':
+                burst({ count: 12, colors: name === 'splash-slime' ? ['#8fd06a', '#b6e08a'] : ['#6ab6e8', '#9fd0f0', '#e0f0ff'], speed: 120, dir: -Math.PI / 2, spread: Math.PI * 0.8, rise: 20 });
+                screen_shake(this.game_area_el, 'sm');
+                haptic(20);
+                break;
+            case 'button-press':
+                haptic(6);
+                break;
+        }
     }
 
     setup() {

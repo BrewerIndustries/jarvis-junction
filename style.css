@@ -3022,3 +3022,59 @@ body {
     color: hsl(41, 78%, 63%);
     font-style: normal;
 }
+
+/* ============================================================
+   Game-feel juice — particle overlay, screen shake, flourish
+   (cosmetic; all disabled under prefers-reduced-motion in JS)
+   ============================================================ */
+#player-game-area { position: relative; }
+.effects-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 20;
+}
+
+@keyframes fx-shake-sm {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(-2px, 1px); }
+    50% { transform: translate(2px, -1px); }
+    75% { transform: translate(-1px, 1px); }
+}
+@keyframes fx-shake-md {
+    0%, 100% { transform: translate(0, 0) rotate(0); }
+    15% { transform: translate(-4px, 2px) rotate(-0.3deg); }
+    35% { transform: translate(4px, -2px) rotate(0.3deg); }
+    55% { transform: translate(-3px, 1px) rotate(-0.2deg); }
+    75% { transform: translate(2px, -1px) rotate(0.2deg); }
+    90% { transform: translate(-1px, 0) rotate(0); }
+}
+@keyframes fx-shake-lg {
+    0%, 100% { transform: translate(0, 0) rotate(0); }
+    10% { transform: translate(-7px, 3px) rotate(-0.6deg); }
+    25% { transform: translate(7px, -4px) rotate(0.6deg); }
+    40% { transform: translate(-6px, 3px) rotate(-0.5deg); }
+    55% { transform: translate(5px, -2px) rotate(0.4deg); }
+    70% { transform: translate(-3px, 2px) rotate(-0.2deg); }
+    85% { transform: translate(2px, -1px) rotate(0.1deg); }
+}
+.fx-shake-sm { animation: fx-shake-sm 0.22s ease-in-out; }
+.fx-shake-md { animation: fx-shake-md 0.34s ease-in-out; }
+.fx-shake-lg { animation: fx-shake-lg 0.46s cubic-bezier(.36, .07, .19, .97); }
+
+/* "Duty complete" flourish on the success message */
+.player-overlay-message[data-reason='success'] > h2 {
+    animation: fx-duty-pop 0.55s cubic-bezier(.2, 1.5, .35, 1) both;
+    text-shadow: 0 1px 0 #0008, 0 0 30px hsla(42, 85%, 55%, 0.55);
+}
+@keyframes fx-duty-pop {
+    0% { transform: scale(0.55) translateY(6px); opacity: 0; }
+    60% { transform: scale(1.1) translateY(0); }
+    100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fx-shake-sm, .fx-shake-md, .fx-shake-lg,
+    .player-overlay-message[data-reason='success'] > h2 { animation: none; }
+}
