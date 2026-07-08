@@ -1573,6 +1573,13 @@ class Player extends PrimaryView {
         }
         this.renderer.use_cc2_anim_speed = options.use_cc2_anim_speed ?? false;
 
+        // Game speed (casual ↔ brisk); clamp to a sane range.
+        this.play_speed = Math.min(2, Math.max(0.5, options.game_speed ?? 1));
+        // Cosmetic-effects toggle (particles/shake); haptics follow the same flag.
+        if (this.effects) {
+            this.effects.enabled = options.effects_enabled ?? true;
+        }
+
         this.music_audio_el.volume = options.music_volume ?? 1.0;
         // TODO hide music info when disabled?
         this.music_enabled = options.music_enabled ?? true;
@@ -3344,6 +3351,14 @@ class OptionsOverlay extends DialogOverlay {
             ),
             mk('dt'),
             mk('dd', mk('label', mk('input', {name: 'use-cc2-anim-speed', type: 'checkbox'}), " Use CC2 animation speed")),
+            mk('h2', "Gameplay"),
+            mk('dt', "Game speed"),
+            mk('dd.option-speed',
+                mk('input', {name: 'game-speed', type: 'range', min: 0.5, max: 2, step: 0.25}),
+                this._speed_label = mk('output', "1×"),
+            ),
+            mk('dt'),
+            mk('dd', mk('label', mk('input', {name: 'effects-enabled', type: 'checkbox'}), " Visual effects (particles & shake)")),
             mk('h2', "Audio"),
             mk('dt', "Music volume"),
             mk('dd.option-volume',
@@ -3460,6 +3475,20 @@ class OptionsOverlay extends DialogOverlay {
         // Load current values
         this.root.elements['touch-mode'].value = this.conductor.options.touch_mode ?? 'swipe';
         this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
+        this.root.elements['game-speed'].value = this.conductor.options.game_speed ?? 1;
+        this.root.elements['effects-enabled'].checked = this.conductor.options.effects_enabled ?? true;
+        // Live-update the speed label, and preview the speed if a game is in progress
+        let update_speed_label = () => {
+            let v = parseFloat(this.root.elements['game-speed'].value);
+            this._speed_label.textContent = `${v}×`;
+        };
+        update_speed_label();
+        this.root.elements['game-speed'].addEventListener('input', ev => {
+            update_speed_label();
+            if (this.conductor.current === player) {
+                player.play_speed = parseFloat(ev.target.value);
+            }
+        });
         this.root.elements['music-volume'].value = this.conductor.options.music_volume ?? 1.0;
         this.root.elements['music-enabled'].checked = this.conductor.options.music_enabled ?? true;
         this.root.elements['sound-volume'].value = this.conductor.options.sound_volume ?? 1.0;
@@ -3640,6 +3669,8 @@ class OptionsOverlay extends DialogOverlay {
         let options = this.conductor.options;
         options.touch_mode = this.root.elements['touch-mode'].value;
         options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
+        options.game_speed = parseFloat(this.root.elements['game-speed'].value);
+        options.effects_enabled = this.root.elements['effects-enabled'].checked;
         options.music_volume = parseFloat(this.root.elements['music-volume'].value);
         options.music_enabled = this.root.elements['music-enabled'].checked;
         options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
