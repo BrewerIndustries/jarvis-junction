@@ -15,6 +15,11 @@ import SOUNDTRACK from './soundtrack.js';
 import { Tileset, TILESET_LAYOUTS, convert_tileset_to_layout, parse_tile_world_large_tileset, infer_tileset_from_image } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, mk_svg } from './util.js';
+
+// Directional actions get "last-pressed-wins" override handling in get_input():
+// holding one direction then pressing another moves in the newer one, and
+// releasing it falls back to whatever direction is still held.
+const DIRECTIONAL_ACTIONS = new Set(['up', 'down', 'left', 'right']);
 import * as util from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
@@ -1804,14 +1809,38 @@ class Player extends PrimaryView {
         }
 
         let input = 0;
-        // Keys
+        // Keys.  Non-directional actions (wait/drop/cycle/swap) OR together as
+        // usual.  Directional keys instead collapse to the single most-recently-
+        // pressed key that's still held, so holding Up then pressing Left moves
+        // left, and releasing Left falls back to Up.  current_keycodes and
+        // current_keycodes_new are Sets, which iterate in insertion (press)
+        // order, so the last directional seen is the newest press.
+        let held_dir = null;  // most recent still-held direction
+        let new_dir = null;   // most recent direction pressed since last read
         for (let keycode of this.current_keycodes) {
-            input |= INPUT_BITS[this.keycode_mapping[keycode]];
+            let action = this.keycode_mapping[keycode];
+            if (DIRECTIONAL_ACTIONS.has(action)) {
+                held_dir = action;
+            }
+            else {
+                input |= INPUT_BITS[action];
+            }
         }
         for (let keycode of this.current_keycodes_new) {
-            input |= INPUT_BITS[this.keycode_mapping[keycode]];
+            let action = this.keycode_mapping[keycode];
+            if (DIRECTIONAL_ACTIONS.has(action)) {
+                new_dir = action;
+            }
+            else {
+                input |= INPUT_BITS[action];
+            }
         }
         this.current_keycodes_new.clear();
+        // A brand-new press this read wins; otherwise the newest still-held one.
+        let active_dir = new_dir ?? held_dir;
+        if (active_dir !== null) {
+            input |= INPUT_BITS[active_dir];
+        }
 
         // Touches
         for (let touch of Object.values(this.current_touches)) {
