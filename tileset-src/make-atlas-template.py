@@ -71,8 +71,8 @@ def main():
     fnum = load_font(20)
     flabel = load_font(12)
 
-    # dim the art slightly so labels read (overlay a light wash)
-    d.rectangle([MARGIN, MARGIN, W, H], fill=(250,246,238,70))
+    # very light wash so labels stay legible over the finished art
+    d.rectangle([MARGIN, MARGIN, W, H], fill=(250,246,238,26))
 
     # grid
     for i in range(GRID+1):
@@ -89,10 +89,7 @@ def main():
         d.text((cx, MARGIN//2), str(i), fill=(90,72,52,255), font=fnum, anchor="mm")
         d.text((MARGIN//2, MARGIN + i*CELL + CELL//2), str(i), fill=(90,72,52,255), font=fnum, anchor="mm")
 
-    # done markers
-    for (c,r) in DONE:
-        x0 = MARGIN + c*CELL; y0 = MARGIN + r*CELL
-        d.polygon([(x0, y0), (x0+16, y0), (x0, y0+16)], fill=(111,138,79,235))
+    # (every cell is now filled procedurally, so no per-cell "done" marks)
 
     # tile name labels at each primary cell
     for name, (c, r, cnt) in sorted(data.items(), key=lambda kv: (kv[1][1], kv[1][0])):
