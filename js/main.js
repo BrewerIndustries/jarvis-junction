@@ -4122,10 +4122,14 @@ class TileEditorOverlay extends DialogOverlay {
         this.compare_b = mk('button', {type: 'button', disabled: true}, "◑ compare");
         this.compare_b.addEventListener('click', () => this._set_compare(! this.comparing));
 
-        // -- minimap --
-        this.map_scale = 6;
+        // -- whole-tileset board (click a cell to edit) --
+        this.map_scale = 12;
         this.minimap = mk('canvas.-minimap', {width: this.cols * this.map_scale, height: this.rows * this.map_scale});
+        this.board_label = mk('div.-board-label');
+        this._hover = null;
         this.minimap.addEventListener('pointerdown', ev => this._minimap_click(ev));
+        this.minimap.addEventListener('pointermove', ev => this._minimap_hover(ev));
+        this.minimap.addEventListener('pointerleave', () => { this._hover = null; this._refresh_minimap(); this.board_label.textContent = ''; });
 
         this.main.append(
             mk('p.-editor-intro', "Paint a cell, then ", mk('b', "apply"), " to see it in the game. Cell numbers match the legend."),
@@ -4149,9 +4153,12 @@ class TileEditorOverlay extends DialogOverlay {
                     this.ref_thumb,
                     this.compare_b,
                     mk('p.-hint', "hold \\ to peek"),
-                    mk('h3', "Map"),
-                    this.minimap,
                 ),
+            ),
+            mk('div.-board',
+                mk('h3', "Whole tileset — click a cell to edit"),
+                this.minimap,
+                this.board_label,
             ),
         );
         this._set_tool('pencil');
@@ -4262,23 +4269,43 @@ class TileEditorOverlay extends DialogOverlay {
     }
 
     _refresh_minimap() {
-        let ctx = this.minimap.getContext('2d');
+        let ctx = this.minimap.getContext('2d'), ms = this.map_scale;
         ctx.imageSmoothingEnabled = false;
-        ctx.clearRect(0, 0, this.minimap.width, this.minimap.height);
+        ctx.fillStyle = '#e9e0cf';
+        ctx.fillRect(0, 0, this.minimap.width, this.minimap.height);
         ctx.drawImage(this.sheet, 0, 0, this.minimap.width, this.minimap.height);
-        if (this.cell) {
-            ctx.strokeStyle = '#e8c46a';
+        if (this._hover) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
             ctx.lineWidth = 2;
-            ctx.strokeRect(this.cell.c * this.map_scale, this.cell.r * this.map_scale, this.map_scale, this.map_scale);
+            ctx.strokeRect(this._hover.c * ms + 1, this._hover.r * ms + 1, ms - 2, ms - 2);
+        }
+        if (this.cell) {
+            ctx.strokeStyle = '#c0392b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.cell.c * ms + 1, this.cell.r * ms + 1, ms - 2, ms - 2);
         }
     }
 
-    _minimap_click(ev) {
+    _minimap_cell(ev) {
         let r = this.minimap.getBoundingClientRect();
-        let col = Math.floor((ev.clientX - r.x) / (r.width / this.cols));
-        let row = Math.floor((ev.clientY - r.y) / (r.height / this.rows));
+        return [
+            Math.floor((ev.clientX - r.x) / (r.width / this.cols)),
+            Math.floor((ev.clientY - r.y) / (r.height / this.rows)),
+        ];
+    }
+    _minimap_click(ev) {
+        let [col, row] = this._minimap_cell(ev);
         let hit = this.cells.findIndex(c => c.c === col && c.r === row);
         if (hit >= 0) this._load_cell(hit);
+    }
+    _minimap_hover(ev) {
+        let [col, row] = this._minimap_cell(ev);
+        this._hover = { c: col, r: row };
+        this._refresh_minimap();
+        let cell = this.cells.find(c => c.c === col && c.r === row);
+        this.board_label.textContent = cell
+            ? `#${cell.n} · ${cell.tile}${cell.label ? ' · ' + cell.label : ''}`
+            : `(${col}, ${row}) — empty`;
     }
 
     _bind_canvas() {

@@ -3121,7 +3121,10 @@ body {
                       linear-gradient(45deg,#b8ab92 25%,transparent 25%,transparent 75%,#b8ab92 75%);
     background-size: 12px 12px; background-position: 0 0, 6px 6px;
 }
-.dialog-tile-editor .-minimap { image-rendering: pixelated; width: 192px; border: 1px solid #0003; cursor: pointer; }
+.dialog-tile-editor .-board { width: 100%; margin-top: 14px; border-top: 1px solid var(--line, #e6dcc9); padding-top: 10px; }
+.dialog-tile-editor .-board h3 { margin: 0 0 6px; font-size: 0.95em; color: hsl(var(--main-hue), 40%, 35%); }
+.dialog-tile-editor .-minimap { image-rendering: pixelated; width: 384px; max-width: 100%; border: 1px solid #0003; cursor: pointer; display: block; }
+.dialog-tile-editor .-board-label { font-family: monospace; font-size: 12px; color: hsl(var(--main-hue), 30%, 35%); margin-top: 5px; min-height: 1.1em; }
 .dialog-tile-editor .-hint { font-size: 0.75em; color: var(--muted, #8c7d69); margin: 0; }
 .dialog-tile-editor .-filmstrip { display: flex; gap: 3px; overflow-x: auto; padding: 2px 0; max-width: 100%; }
 .dialog-tile-editor .-frame {
