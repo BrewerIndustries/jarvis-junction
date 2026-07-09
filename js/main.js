@@ -303,9 +303,9 @@ class SFXPlayer {
         this.player_y = null;
         this.sounds = {};
         this.sound_sources = {
-            // handcrafted
-            blocked1: 'sfx/mmf1.ogg',
-            blocked2: 'sfx/mmf2.ogg',
+            // Butler effort-grunts on bumping into a wall (formant-synthesized "unh")
+            blocked1: 'sfx/grunt1.wav',
+            blocked2: 'sfx/grunt2.wav',
             // https://jummbus.bitbucket.io/#j2N04bombn110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T0v0pL0OD0Ou00q1d1f8y0z2C0w2c0h2T2v0kL0OD0Ou02q1d1f6y1z2C1w1b4gp1b0aCTFucgds0
             bomb: 'sfx/bomb.ogg',
             // https://jummbus.bitbucket.io/#j2N0cbutton-pressn100s0k0l00e00t3Mm1a3g00j07i0r1O_U0o3T0v0pL0OD0Ou00q1d1f3y1z1C2w0c0h0b4p1bJdn51eMUsS0
