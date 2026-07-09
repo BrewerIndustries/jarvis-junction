@@ -69,10 +69,20 @@ levels are designed for fair rules. Not player-selectable in v1.
 - **Servers / accounts** (Pillar 6): global leaderboards, cloud save. These need a
   backend (Cloudflare Worker + D1 flavor), not plain GitHub Pages — phase 2.
 
-## Open decisions parked for the art phase
+## Art direction — DECIDED (2026-07-08)
 
-- Art direction fork: **Victorian manor** vs **modern smart-home** butler.
-- Bespoke SFX/music sourcing (draw/commission vs CC0 household foley).
+**Cozy cottage / lived-in** — soft, homey, warm: wood, rugs, plants, warm clutter.
+Friendlier than a grand manor; pairs with the brass UI. Approach: **procedural
+start** (I generate the geometric terrain tiles), **character/monster art in a
+later dedicated pass** (Aseprite / artist / AI — the sprites are real pixel art).
+
+Started: cozy wood-plank **floor**, honey-**brick wall**, soft **water** — see
+`tileset-src/make-cottage-tiles.py` (Pillow, composited into `tileset-lexy.png`).
+Next terrain: gravel, dirt, fire, ice, then the decorative custom-colour tiles;
+then the character/monster pass.
+
+- Still open: bespoke SFX/music sourcing (wall-bump is now a synthesized grunt;
+  `sfx/make-grunt.py`).
 
 ## Rough build order
 
