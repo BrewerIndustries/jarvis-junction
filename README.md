@@ -31,11 +31,14 @@ It's static JS with **no build system**: serve the directory and open it in a br
   toggle, last-pressed-wins key override, and input buffering.
 - ✅ **In-app tile editor** (Options → Tilesets → *Edit tiles in-app*): a Piskel-style
   pixel editor — pencil/eraser/fill/line/rect, palette + custom color, undo, copy/paste,
-  onion skin, a searchable per-cell navigator, and a whole-tileset board (click any cell
-  to edit). **Compare** ghost-overlays a reference set (the original Lexy art, or any PNG
-  you load) on the canvas for tracing, with a ghost-opacity slider and hold-`\` peek.
+  reflect (flip horizontal/vertical), onion skin, a searchable per-cell navigator, and a
+  whole-tileset board (click any cell to edit). **Compare** ghost-overlays a reference set
+  (the original Lexy art, or any PNG you load) on the canvas for tracing, with a
+  ghost-opacity slider and hold-`\` peek.
   Edits save live to an *"Edited in-app"* tileset that persists across reloads and is a
-  first-class row in the Tilesets table (so hitting Save no longer drops it back to Lexy).
+  first-class row in the Tilesets table. Applying registers + selects that row in the open
+  Options dialog, so a subsequent **Save no longer clobbers the edit back to Lexy** (the
+  cause of edits vanishing after reload).
   An **"Editing:" source picker** in the editor lets you choose which tileset to paint
   (so you continue your edits instead of always restarting from the base), and an
   **"Active skin" dropdown** in Options → Tilesets switches the live in-game tileset

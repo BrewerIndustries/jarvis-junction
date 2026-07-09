@@ -3538,7 +3538,7 @@ class OptionsOverlay extends DialogOverlay {
             // lost); the editor itself lets you switch which tileset you're painting.
             let active = this.conductor.options.tilesets['ll'];
             let initial = this.available_tilesets[active] ? active : 'lexy';
-            new TileEditorOverlay(this.conductor, this.available_tilesets, initial).open();
+            new TileEditorOverlay(this.conductor, this.available_tilesets, initial, this).open();
         });
         this.main.append(
             mk('p.-reskin-intro',
@@ -3699,6 +3699,33 @@ class OptionsOverlay extends DialogOverlay {
                 convert_tileset_to_layout(def.tileset, 'tw-animated');
             }),
         ));
+    }
+
+    // Called by the tile editor after it applies edits: make the "Edited in-app" set a
+    // real row in the table and select it, so a later Save preserves it instead of
+    // reverting every slot to whatever radio was checked when the dialog opened.
+    _register_editor_tileset(tileset) {
+        let def = this.available_tilesets[EDITOR_TILESET_BUCKET];
+        if (! def) {
+            def = this.available_tilesets[EDITOR_TILESET_BUCKET] = {
+                ident: EDITOR_TILESET_BUCKET, name: "Edited in-app ✎",
+                is_already_stored: true, tileset,
+            };
+        }
+        else {
+            def.tileset = tileset;
+        }
+        if (! this.tileset_table.querySelector(
+                `input[name="tileset-ll"][value="${CSS.escape(EDITOR_TILESET_BUCKET)}"]`)) {
+            this._add_tileset_row(EDITOR_TILESET_BUCKET, def);
+        }
+        for (let slot of TILESET_SLOTS) {
+            let radio = this.tileset_table.querySelector(
+                `input[name="tileset-${slot.ident}"][value="${CSS.escape(EDITOR_TILESET_BUCKET)}"]`);
+            if (radio) radio.checked = true;
+        }
+        this._populate_active_skin_select();
+        this.active_skin_select.value = EDITOR_TILESET_BUCKET;
     }
 
     // ---- Quick "active skin" selector (live, drives all slots) -------------
@@ -4095,11 +4122,14 @@ const EDITOR_PALETTE = [
 ];
 
 class TileEditorOverlay extends DialogOverlay {
-    constructor(conductor, sources, initial_ident) {
+    constructor(conductor, sources, initial_ident, options_overlay = null) {
         super(conductor);
         this.root.classList.add('dialog-tile-editor');
         this.set_title("Tile editor");
 
+        // The Options dialog that launched us, so Apply can register the edited set as a
+        // table row + selection (otherwise Options' Save would clobber it back to Lexy).
+        this.options_overlay = options_overlay;
         // Tilesets available to paint on (ident -> {name, tileset, …}); switchable in the UI.
         this.sources = sources;
         this.source_ident = (sources && sources[initial_ident]) ? initial_ident
@@ -4195,6 +4225,11 @@ class TileEditorOverlay extends DialogOverlay {
         this.paste_b.addEventListener('click', () => this._paste());
         let undo_b = mk('button', {type: 'button'}, "↶ undo");
         undo_b.addEventListener('click', () => this._undo_pop());
+        // -- reflect --
+        let flip_h_b = mk('button', {type: 'button', title: 'flip horizontally'}, "⇆ flip");
+        flip_h_b.addEventListener('click', () => this._flip('h'));
+        let flip_v_b = mk('button', {type: 'button', title: 'flip vertically'}, "⇅ flip");
+        flip_v_b.addEventListener('click', () => this._flip('v'));
         // -- onion --
         this.onion_cb = mk('input', {type: 'checkbox'});
         this.onion_cb.addEventListener('change', () => { this.onion = this.onion_cb.checked; this._redraw_edit(); });
@@ -4267,6 +4302,7 @@ class TileEditorOverlay extends DialogOverlay {
                 mk('div.-left',
                     tool_row,
                     mk('div.-actions', copy_b, this.paste_b, undo_b),
+                    mk('div.-actions', flip_h_b, flip_v_b),
                     pal,
                     mk('label.-custom-color', "custom ", this.color_input),
                     mk('label.-onion', this.onion_cb, " onion skin"),
@@ -4596,6 +4632,27 @@ class TileEditorOverlay extends DialogOverlay {
         this._redraw_edit();
     }
 
+    // Reflect the current cell in place. axis 'h' = mirror left↔right, 'v' = top↔bottom.
+    _flip(axis) {
+        this._push_undo();
+        let TS = this.TS, [ox, oy] = this._sheet_xy(0, 0);
+        let src = this.sctx.getImageData(ox, oy, TS, TS);
+        let dst = this.sctx.createImageData(TS, TS);
+        for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            let sx = axis === 'h' ? (TS - 1 - x) : x;
+            let sy = axis === 'v' ? (TS - 1 - y) : y;
+            let si = (sy * TS + sx) * 4, di = (y * TS + x) * 4;
+            dst.data[di] = src.data[si];
+            dst.data[di + 1] = src.data[si + 1];
+            dst.data[di + 2] = src.data[si + 2];
+            dst.data[di + 3] = src.data[si + 3];
+        }
+        this.sctx.putImageData(dst, ox, oy);
+        this._redraw_edit();
+        this._refresh_filmstrip();
+        this._refresh_minimap();
+    }
+
     _push_undo() {
         let TS = this.TS, [ox, oy] = this._sheet_xy(0, 0);
         this._undo.push(this.sctx.getImageData(ox, oy, TS, TS));
@@ -4623,25 +4680,33 @@ class TileEditorOverlay extends DialogOverlay {
             this.conductor.editor.renderer.tileset = this.work_tileset;
         }
         // Persist as a custom tileset so it survives reload (reuses the load path).
-        save_json_to_storage(CUSTOM_TILESET_PREFIX + EDITOR_TILESET_BUCKET, {
-            ident: EDITOR_TILESET_BUCKET, name: 'Edited tileset',
-            layout: this.layout['#ident'], tile_width: this.TS, tile_height: this.TS,
-            src: this.sheet.toDataURL('image/png'),
-        });
-        for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = EDITOR_TILESET_BUCKET;
-        this.conductor.save_stash();
+        try {
+            save_json_to_storage(CUSTOM_TILESET_PREFIX + EDITOR_TILESET_BUCKET, {
+                ident: EDITOR_TILESET_BUCKET, name: 'Edited tileset',
+                layout: this.layout['#ident'], tile_width: this.TS, tile_height: this.TS,
+                src: this.sheet.toDataURL('image/png'),
+            });
+            for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = EDITOR_TILESET_BUCKET;
+            this.conductor.save_stash();
+        }
+        catch (err) {
+            console.error("Couldn't save the edited tileset:", err);
+            window.alert("Your edits are showing now, but couldn't be saved for next time " +
+                "(browser storage may be full). They'll be lost on reload.");
+        }
+
+        // Make sure the launching Options dialog reflects the edited set as a selected row,
+        // so its Save button preserves it rather than reverting every slot to Lexy.
+        if (this.options_overlay) this.options_overlay._register_editor_tileset(this.work_tileset);
 
         // The applied edits ARE the "Edited in-app" set now — make it a selectable source
         // (and the current one) so continued editing builds on this instead of the original.
-        if (! this.sources[EDITOR_TILESET_BUCKET]) {
-            this.sources[EDITOR_TILESET_BUCKET] = {
-                ident: EDITOR_TILESET_BUCKET, name: "Edited in-app ✎",
-                is_already_stored: true, tileset: this.work_tileset,
-            };
+        this.sources[EDITOR_TILESET_BUCKET] = this.sources[EDITOR_TILESET_BUCKET] || {
+            ident: EDITOR_TILESET_BUCKET, name: "Edited in-app ✎", is_already_stored: true,
+        };
+        this.sources[EDITOR_TILESET_BUCKET].tileset = this.work_tileset;
+        if (! [...this.source_select.options].some(o => o.value === EDITOR_TILESET_BUCKET)) {
             this.source_select.append(mk('option', {value: EDITOR_TILESET_BUCKET}, "Edited in-app ✎"));
-        }
-        else {
-            this.sources[EDITOR_TILESET_BUCKET].tileset = this.work_tileset;
         }
         this.source_ident = EDITOR_TILESET_BUCKET;
         this.source_select.value = EDITOR_TILESET_BUCKET;
