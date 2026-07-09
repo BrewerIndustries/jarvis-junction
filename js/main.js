@@ -3370,6 +3370,20 @@ const CUSTOM_TILESET_BUCKETS = ['Custom 1', 'Custom 2', 'Custom 3'];
 // CUSTOM_TILESET_BUCKETS so uploads never clobber it, and never garbage-collected on Save).
 const EDITOR_TILESET_BUCKET = 'Editor';
 const CUSTOM_TILESET_PREFIX = "Lexy's Labyrinth custom tileset: ";
+
+// Every user (non-built-in) tileset is persisted at CUSTOM_TILESET_PREFIX + <name>, where
+// the name is both its display name and its ident.  Enumerate them straight from storage so
+// they always reappear — no fixed bucket list to run out of or silently overwrite.
+function stored_tileset_names() {
+    let names = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+        let k = window.localStorage.key(i);
+        if (k && k.startsWith(CUSTOM_TILESET_PREFIX)) {
+            names.push(k.slice(CUSTOM_TILESET_PREFIX.length));
+        }
+    }
+    return names;
+}
 class OptionsOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
@@ -3476,29 +3490,31 @@ class OptionsOverlay extends DialogOverlay {
                 newdef.tileset = new Tileset(
                     img, TILESET_LAYOUTS[newdef.layout ?? 'lexy'],
                     newdef.tile_width, newdef.tile_height);
+                // Register it so fallbacks and comparisons resolve consistently.
+                conductor._loaded_tilesets[ident] = newdef.tileset;
             }
             this.available_tilesets[ident] = newdef;
         }
-        for (let bucket of CUSTOM_TILESET_BUCKETS) {
-            if (conductor._loaded_tilesets[bucket]) {
-                this.available_tilesets[bucket] = {
-                    ident: bucket,
-                    name: bucket,
-                    is_already_stored: true,
-                    tileset: conductor._loaded_tilesets[bucket],
-                };
-            }
+        this._preview_tds = {};
+        // Every user tileset ever saved, straight from storage — so nothing gets lost.
+        for (let name of stored_tileset_names()) {
+            if (this.available_tilesets[name]) continue;
+            let stored = load_json_from_storage(CUSTOM_TILESET_PREFIX + name);
+            if (! stored) continue;
+            let tileset = conductor._loaded_tilesets[name] ?? this._make_tileset({ ...stored, ident: name });
+            this.available_tilesets[name] = {
+                ident: name,
+                name: stored.name || name,
+                is_user: true,
+                is_already_stored: true,
+                tileset,
+            };
         }
-        // Surface any other stored tilesets (e.g. the in-app editor's "Editor" bucket)
-        // as first-class rows, so choosing them and hitting Save doesn't silently drop
-        // them back to Lexy.
+        // Any in-memory tileset not yet written to storage (e.g. just uploaded/edited).
         for (let [ident, tileset] of Object.entries(conductor._loaded_tilesets)) {
             if (this.available_tilesets[ident] || BUILTIN_TILESETS[ident]) continue;
             this.available_tilesets[ident] = {
-                ident,
-                name: ident === EDITOR_TILESET_BUCKET ? "Edited in-app ✎" : ident,
-                is_already_stored: true,
-                tileset,
+                ident, name: ident, is_user: true, is_already_stored: true, tileset,
             };
         }
 
@@ -3508,6 +3524,7 @@ class OptionsOverlay extends DialogOverlay {
         for (let slot of TILESET_SLOTS) {
             thead.append(mk('th.-slot', slot.name));
         }
+        thead.append(mk('th', "Manage"));
         for (let [ident, def] of Object.entries(this.available_tilesets)) {
             this._add_tileset_row(ident, def);
         }
@@ -3542,8 +3559,9 @@ class OptionsOverlay extends DialogOverlay {
         });
         this.main.append(
             mk('p.-reskin-intro',
-                "Reskin the game — ", mk('b', "paint tiles right here"), " with ", mk('b', "Edit tiles"), ", or ",
-                mk('b', "download"), " the sheet, edit it elsewhere, and ", mk('b', "load"), " it back."),
+                "Reskin the game. ", mk('b', "Duplicate"), " a tileset in the table above to make your own named copy, then ",
+                mk('b', "Edit"), " it — or paint the active skin here, ", mk('b', "download"),
+                " the sheet to edit elsewhere, and ", mk('b', "load"), " it back."),
             mk('p', edit_button),
             mk('p', dl_tileset_button, " ", dl_guide_button, " ", legend_button,
                 " — the sheet, an overlay numbering every cell, and a legend saying what each number is."),
@@ -3643,18 +3661,16 @@ class OptionsOverlay extends DialogOverlay {
     }
 
     _add_tileset_row(ident, def) {
-        let tr = mk('tr');
+        let tr = mk('tr', {'data-tileset': ident});
         this.tileset_table.append(tr);
 
-        tr.append(mk('td',
-            // TODO maybe draw these all to a single canvas
-            CanvasRenderer.draw_single_tile(def.tileset, 'player'),
-            CanvasRenderer.draw_single_tile(def.tileset, 'chip'),
-            CanvasRenderer.draw_single_tile(def.tileset, 'exit'),
-        ));
+        let preview = mk('td.-preview');
+        this._preview_tds[ident] = preview;
+        tr.append(preview);
+        this._redraw_tileset_previews(ident);
 
         tr.append(mk('td.-format',
-            ...(def.name ? [mk('div.-tileset-name', def.name)] : []),
+            mk('div.-tileset-name', def.name || ident),
             def.tileset.layout['#name'],
             mk('br'),
             `${def.tileset.size_x}×${def.tileset.size_y}px`,
@@ -3672,60 +3688,192 @@ class OptionsOverlay extends DialogOverlay {
             }
         }
 
-        // FIXME make buttons work
-        return;
-
-        if (def.is_builtin) {
-            tr.append(mk('td'));
+        // Contextual actions: everything can be duplicated; user tilesets can also be
+        // edited, renamed, and deleted.  Built-ins are read-only templates.
+        let wrap = mk('div.-actions-wrap');
+        tr.append(mk('td.-tileset-actions', wrap));
+        let dup = mk('button', {type: 'button', title: 'Duplicate this tileset under a new name'}, "⧉ Duplicate");
+        dup.addEventListener('click', () => this._duplicate_tileset(ident));
+        wrap.append(dup);
+        if (def.is_user) {
+            let edit = mk('button', {type: 'button'}, "✎ Edit");
+            edit.addEventListener('click', () => this._edit_tileset(ident));
+            let rename = mk('button', {type: 'button'}, "Rename");
+            rename.addEventListener('click', () => this._rename_tileset(ident));
+            let del = mk('button.-danger', {type: 'button'}, "Delete");
+            del.addEventListener('click', () => this._delete_tileset(ident));
+            wrap.append(edit, rename, del);
         }
-        else {
-            // TODO this doesn't do anything yet.  currently we just delete any tilesets not
-            // assigned to a slot
-            tr.append(mk('td', mk('button', {type: 'button'}, "Forget")));
-        }
-
-        tr.append(mk('td',
-            make_button("LL", () => {
-                convert_tileset_to_layout(def.tileset, 'lexy');
-            }),
-            make_button("CC2", () => {
-                let canvas = convert_tileset_to_layout(def.tileset, 'cc2');
-                mk('a', {href: canvas.toDataURL(), target: '_new'}).click();
-            }),
-            make_button("MSCC", () => {
-                convert_tileset_to_layout(def.tileset, 'tw-static');
-            }),
-            make_button("TW", () => {
-                convert_tileset_to_layout(def.tileset, 'tw-animated');
-            }),
-        ));
     }
 
-    // Called by the tile editor after it applies edits: make the "Edited in-app" set a
-    // real row in the table and select it, so a later Save preserves it instead of
-    // reverting every slot to whatever radio was checked when the dialog opened.
-    _register_editor_tileset(tileset) {
-        let def = this.available_tilesets[EDITOR_TILESET_BUCKET];
+    _redraw_tileset_previews(ident) {
+        let td = this._preview_tds[ident];
+        let def = this.available_tilesets[ident];
+        if (! td || ! def) return;
+        td.textContent = '';
+        td.append(
+            CanvasRenderer.draw_single_tile(def.tileset, 'player'),
+            CanvasRenderer.draw_single_tile(def.tileset, 'chip'),
+            CanvasRenderer.draw_single_tile(def.tileset, 'exit'),
+        );
+    }
+
+    // Build a Tileset from a stored def (data-URI image); redraws its previews once decoded.
+    _make_tileset(def) {
+        let ident = def.ident ?? def.name;
+        let img = new Image;
+        let layout = TILESET_LAYOUTS[def.layout] ?? TILESET_LAYOUTS['lexy'];
+        let tileset = new Tileset(img, layout, def.tile_width ?? 32, def.tile_height ?? 32);
+        img.addEventListener('load', () => this._redraw_tileset_previews(ident));
+        img.src = def.src;
+        this.conductor._loaded_tilesets[ident] = tileset;
+        return tileset;
+    }
+
+    _unique_tileset_name(base) {
+        let taken = name => BUILTIN_TILESETS[name] || this.available_tilesets[name]
+            || stored_tileset_names().includes(name);
+        if (! taken(base)) return base;
+        for (let i = 2; ; i++) {
+            let cand = `${base} ${i}`;
+            if (! taken(cand)) return cand;
+        }
+    }
+
+    // Copy a tileset into a new, independently-stored, editable one (prompts for a name).
+    _duplicate_tileset(ident) {
+        let def = this.available_tilesets[ident];
+        if (! def) return;
+        let suggestion = this._unique_tileset_name(`${def.name || ident} copy`);
+        let name = window.prompt("Name for the new tileset:", suggestion);
+        if (name === null) return;
+        name = name.trim();
+        if (! name) return;
+        if (BUILTIN_TILESETS[name] || this.available_tilesets[name] || stored_tileset_names().includes(name)) {
+            window.alert(`A tileset named "${name}" already exists — pick a different name.`);
+            return;
+        }
+        let src = def.tileset, img = src.image;
+        let canvas = mk('canvas', {width: img.naturalWidth || img.width, height: img.naturalHeight || img.height});
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        let tileset = new Tileset(canvas, src.layout, src.size_x, src.size_y);
+        try {
+            save_json_to_storage(CUSTOM_TILESET_PREFIX + name, {
+                ident: name, name, layout: src.layout['#ident'],
+                tile_width: src.size_x, tile_height: src.size_y, src: canvas.toDataURL('image/png'),
+            });
+        }
+        catch (err) {
+            console.error(err);
+            window.alert("Couldn't save the new tileset — browser storage may be full.");
+            return;
+        }
+        this.conductor._loaded_tilesets[name] = tileset;
+        this.available_tilesets[name] = { ident: name, name, is_user: true, is_already_stored: true, tileset };
+        this._add_tileset_row(name, this.available_tilesets[name]);
+        this._populate_active_skin_select();
+        this.active_skin_select.value = name;
+        return name;
+    }
+
+    _rename_tileset(ident) {
+        let def = this.available_tilesets[ident];
+        if (! def || ! def.is_user) return;
+        let name = window.prompt("New name for this tileset:", def.name || ident);
+        if (name === null) return;
+        name = name.trim();
+        if (! name || name === ident) return;
+        if (BUILTIN_TILESETS[name] || this.available_tilesets[name] || stored_tileset_names().includes(name)) {
+            window.alert(`A tileset named "${name}" already exists — pick a different name.`);
+            return;
+        }
+        let stored = load_json_from_storage(CUSTOM_TILESET_PREFIX + ident) || {};
+        stored.ident = name; stored.name = name;
+        try { save_json_to_storage(CUSTOM_TILESET_PREFIX + name, stored); }
+        catch (err) { console.error(err); window.alert("Couldn't rename — storage may be full."); return; }
+        window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + ident);
+        // Move it over in memory and re-point any slots that used the old ident.
+        this.conductor._loaded_tilesets[name] = this.conductor._loaded_tilesets[ident];
+        delete this.conductor._loaded_tilesets[ident];
+        this.available_tilesets[name] = { ...def, ident: name, name };
+        delete this.available_tilesets[ident];
+        for (let slot of TILESET_SLOTS) {
+            if (this.conductor.options.tilesets[slot.ident] === ident) {
+                this.conductor.options.tilesets[slot.ident] = name;
+            }
+        }
+        this.conductor.save_stash();
+        this._rebuild_tileset_table();
+    }
+
+    _delete_tileset(ident) {
+        let def = this.available_tilesets[ident];
+        if (! def || ! def.is_user) return;
+        if (! window.confirm(`Delete the tileset "${def.name || ident}"? This can't be undone.`)) return;
+        window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + ident);
+        delete this.conductor._loaded_tilesets[ident];
+        delete this.available_tilesets[ident];
+        // Any slot pointing at it falls back to the built-in default.
+        for (let slot of TILESET_SLOTS) {
+            if (this.conductor.options.tilesets[slot.ident] === ident) {
+                this.conductor.options.tilesets[slot.ident] = 'lexy';
+                this.conductor.tilesets[slot.ident] = this.available_tilesets['lexy'].tileset;
+            }
+        }
+        this.conductor.save_stash();
+        this._apply_tilesets_live();
+        this._rebuild_tileset_table();
+    }
+
+    _edit_tileset(ident) {
+        if (! this.available_tilesets[ident]) return;
+        new TileEditorOverlay(this.conductor, this.available_tilesets, ident, this).open();
+    }
+
+    // Re-render the whole table + selectors from available_tilesets (after add/rename/delete).
+    _rebuild_tileset_table() {
+        for (let tr of [...this.tileset_table.querySelectorAll('tr[data-tileset]')]) tr.remove();
+        this._preview_tds = {};
+        for (let [id, def] of Object.entries(this.available_tilesets)) {
+            this._add_tileset_row(id, def);
+        }
+        // Re-check radios to match the saved slots.
+        for (let slot of TILESET_SLOTS) {
+            let value = this.conductor.options.tilesets[slot.ident] ?? 'lexy';
+            let radio = this.tileset_table.querySelector(
+                `input[name="tileset-${slot.ident}"][value="${CSS.escape(value)}"]`);
+            if (radio) radio.checked = true;
+        }
+        this._populate_active_skin_select();
+    }
+
+    // Called by the tile editor after it applies edits to a user tileset: make sure that
+    // tileset is a real, selected row so a later Save preserves it instead of reverting
+    // every slot to whatever radio was checked when the dialog opened.
+    _register_user_tileset(ident, tileset, name = ident) {
+        let def = this.available_tilesets[ident];
         if (! def) {
-            def = this.available_tilesets[EDITOR_TILESET_BUCKET] = {
-                ident: EDITOR_TILESET_BUCKET, name: "Edited in-app ✎",
-                is_already_stored: true, tileset,
+            def = this.available_tilesets[ident] = {
+                ident, name, is_user: true, is_already_stored: true, tileset,
             };
         }
         else {
             def.tileset = tileset;
         }
         if (! this.tileset_table.querySelector(
-                `input[name="tileset-ll"][value="${CSS.escape(EDITOR_TILESET_BUCKET)}"]`)) {
-            this._add_tileset_row(EDITOR_TILESET_BUCKET, def);
+                `input[name="tileset-ll"][value="${CSS.escape(ident)}"]`)) {
+            this._add_tileset_row(ident, def);
+        }
+        else {
+            this._redraw_tileset_previews(ident);
         }
         for (let slot of TILESET_SLOTS) {
             let radio = this.tileset_table.querySelector(
-                `input[name="tileset-${slot.ident}"][value="${CSS.escape(EDITOR_TILESET_BUCKET)}"]`);
+                `input[name="tileset-${slot.ident}"][value="${CSS.escape(ident)}"]`);
             if (radio) radio.checked = true;
         }
         this._populate_active_skin_select();
-        this.active_skin_select.value = EDITOR_TILESET_BUCKET;
+        this.active_skin_select.value = ident;
     }
 
     // ---- Quick "active skin" selector (live, drives all slots) -------------
@@ -3959,16 +4107,32 @@ class OptionsOverlay extends DialogOverlay {
         let tilesetdef = {
             ident: tileset_ident,
             name: tileset_name,
+            is_user: true,
             canvas: tileset.image,
             tileset: tileset,
             layout: tileset.layout['#ident'],
             tile_width: tileset.size_x,
             tile_height: tileset.size_y,
         };
+        // Persist immediately so it's a full, manageable user tileset right away (not just
+        // when you happen to assign it to a slot and Save).
+        try {
+            save_json_to_storage(CUSTOM_TILESET_PREFIX + tileset_ident, {
+                ident: tileset_ident, name: tileset_name, layout: tilesetdef.layout,
+                tile_width: tilesetdef.tile_width, tile_height: tilesetdef.tile_height,
+                src: tileset.image.toDataURL('image/png'),
+            });
+            tilesetdef.is_already_stored = true;
+            this.conductor._loaded_tilesets[tileset_ident] = tileset;
+        }
+        catch (err) {
+            console.error("Couldn't save uploaded tileset:", err);
+        }
         this.available_tilesets[tileset_ident] = tilesetdef;
 
         this.custom_tileset_counter += 1;
         this._add_tileset_row(tileset_ident, tilesetdef);
+        this._populate_active_skin_select();
     }
 
     update_selected_tileset(slot_ident) {
@@ -4002,59 +4166,33 @@ class OptionsOverlay extends DialogOverlay {
         options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
         options.show_captions = this.root.elements['show-captions'].checked;
 
-        // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data URIs,
-        // and /delete/ any custom ones we're not using any more, both of which require knowing
-        // which slots we're already using first
-        let buckets_in_use = new Set;
-        let chosen_tilesets = {};
+        // Tilesets: assign the per-format slot selections.  User tilesets are persisted
+        // independently (on create / edit / duplicate) and managed with explicit Delete, so
+        // Save no longer garbage-collects anything — it just records which set each slot uses.
         for (let slot of TILESET_SLOTS) {
-            let tileset_ident = this.root.elements[`tileset-${slot.ident}`].value;
-            let tilesetdef = this.available_tilesets[tileset_ident];
-            if (! tilesetdef) {
-                tilesetdef = this.available_tilesets['lexy'];
-            }
+            let ident = this.root.elements[`tileset-${slot.ident}`].value;
+            let def = this.available_tilesets[ident] || this.available_tilesets['lexy'];
+            ident = def.ident;
 
-            chosen_tilesets[slot.ident] = tilesetdef;
-            if (tilesetdef.is_already_stored) {
-                buckets_in_use.add(tilesetdef.ident);
-            }
-        }
-        // Clear out _loaded_tilesets first so it no longer refers to any custom tilesets we end
-        // up deleting
-        this.conductor._loaded_tilesets = {};
-        for (let [slot_ident, tilesetdef] of Object.entries(chosen_tilesets)) {
-            if (tilesetdef.is_builtin || tilesetdef.is_already_stored) {
-                options.tilesets[slot_ident] = tilesetdef.ident;
-            }
-            else {
-                // This is a newly uploaded one
-                let data_uri = tilesetdef.data_uri ?? tilesetdef.canvas.toDataURL('image/png');
-                let storage_bucket = CUSTOM_TILESET_BUCKETS.find(
-                    bucket => ! buckets_in_use.has(bucket));
-                if (! storage_bucket) {
-                    console.error("Somehow ran out of storage buckets, this should be impossible??");
-                    continue;
+            if (! (def.is_builtin || def.is_already_stored)) {
+                // A freshly-uploaded tileset that hasn't been written yet — store it now.
+                try {
+                    save_json_to_storage(CUSTOM_TILESET_PREFIX + ident, {
+                        ident, name: def.name || ident, layout: def.layout,
+                        tile_width: def.tile_width, tile_height: def.tile_height,
+                        src: def.data_uri ?? def.canvas.toDataURL('image/png'),
+                    });
+                    def.is_already_stored = true;
                 }
-                buckets_in_use.add(storage_bucket);
-                save_json_to_storage(CUSTOM_TILESET_PREFIX + storage_bucket, {
-                    src: data_uri,
-                    name: storage_bucket,
-                    layout: tilesetdef.layout,
-                    tile_width: tilesetdef.tile_width,
-                    tile_height: tilesetdef.tile_height,
-                });
-                options.tilesets[slot_ident] = storage_bucket;
+                catch (err) {
+                    console.error("Couldn't save uploaded tileset:", err);
+                    window.alert("Couldn't save a tileset — browser storage may be full.");
+                }
             }
 
-            // Update the conductor's loaded tilesets
-            this.conductor.tilesets[slot_ident] = tilesetdef.tileset;
-            this.conductor._loaded_tilesets[options.tilesets[slot_ident]] = tilesetdef.tileset;
-        }
-        // Delete old custom set URIs
-        for (let bucket of CUSTOM_TILESET_BUCKETS) {
-            if (! buckets_in_use.has(bucket)) {
-                window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + bucket);
-            }
+            options.tilesets[slot.ident] = ident;
+            this.conductor.tilesets[slot.ident] = def.tileset;
+            this.conductor._loaded_tilesets[ident] = def.tileset;
         }
 
         this.conductor.save_stash();
@@ -4669,24 +4807,45 @@ class TileEditorOverlay extends DialogOverlay {
     }
 
     _apply() {
+        // Work out where these edits should be saved.  You can only overwrite a *user*
+        // tileset; editing a read-only built-in saves the result as a new named tileset.
+        let def = this.sources[this.source_ident];
+        let target = this.source_ident;
+        let target_name = (def && def.name) || this.source_ident;
+        if (! def || ! def.is_user) {
+            let base = this._unique_source_name(`${target_name} (edited)`);
+            let name = window.prompt(
+                `"${target_name}" is a built-in tileset and can't be overwritten.\n` +
+                `Save your changes as a new tileset named:`, base);
+            if (name === null) return;
+            name = name.trim();
+            if (! name) return;
+            if (this.sources[name] || BUILTIN_TILESETS[name]) {
+                window.alert(`A tileset named "${name}" already exists — pick a different name.`);
+                return;
+            }
+            target = name;
+            target_name = name;
+        }
+
         // Make the working tileset active everywhere, live.
         for (let slot of TILESET_SLOTS) {
             this.conductor.tilesets[slot.ident] = this.work_tileset;
         }
-        this.conductor._loaded_tilesets[EDITOR_TILESET_BUCKET] = this.work_tileset;
+        this.conductor._loaded_tilesets[target] = this.work_tileset;
         let p = this.conductor.player;
         if (p && p.renderer) { p.renderer.tileset = this.work_tileset; if (p._redraw) p._redraw(); }
         if (this.conductor.editor && this.conductor.editor.renderer) {
             this.conductor.editor.renderer.tileset = this.work_tileset;
         }
-        // Persist as a custom tileset so it survives reload (reuses the load path).
+        // Persist to the target tileset so it survives reload (reuses the load path).
         try {
-            save_json_to_storage(CUSTOM_TILESET_PREFIX + EDITOR_TILESET_BUCKET, {
-                ident: EDITOR_TILESET_BUCKET, name: 'Edited tileset',
+            save_json_to_storage(CUSTOM_TILESET_PREFIX + target, {
+                ident: target, name: target_name,
                 layout: this.layout['#ident'], tile_width: this.TS, tile_height: this.TS,
                 src: this.sheet.toDataURL('image/png'),
             });
-            for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = EDITOR_TILESET_BUCKET;
+            for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = target;
             this.conductor.save_stash();
         }
         catch (err) {
@@ -4695,22 +4854,29 @@ class TileEditorOverlay extends DialogOverlay {
                 "(browser storage may be full). They'll be lost on reload.");
         }
 
-        // Make sure the launching Options dialog reflects the edited set as a selected row,
-        // so its Save button preserves it rather than reverting every slot to Lexy.
-        if (this.options_overlay) this.options_overlay._register_editor_tileset(this.work_tileset);
+        // Reflect the target as a selected row in the launching Options dialog, so its Save
+        // preserves it rather than reverting every slot.
+        if (this.options_overlay) this.options_overlay._register_user_tileset(target, this.work_tileset, target_name);
 
-        // The applied edits ARE the "Edited in-app" set now — make it a selectable source
-        // (and the current one) so continued editing builds on this instead of the original.
-        this.sources[EDITOR_TILESET_BUCKET] = this.sources[EDITOR_TILESET_BUCKET] || {
-            ident: EDITOR_TILESET_BUCKET, name: "Edited in-app ✎", is_already_stored: true,
-        };
-        this.sources[EDITOR_TILESET_BUCKET].tileset = this.work_tileset;
-        if (! [...this.source_select.options].some(o => o.value === EDITOR_TILESET_BUCKET)) {
-            this.source_select.append(mk('option', {value: EDITOR_TILESET_BUCKET}, "Edited in-app ✎"));
+        // Keep editing the target tileset: register it as a source (if new) and select it.
+        this.sources[target] = this.sources[target] || { ident: target, name: target_name, is_user: true, is_already_stored: true };
+        this.sources[target].tileset = this.work_tileset;
+        this.sources[target].is_user = true;
+        if (! [...this.source_select.options].some(o => o.value === target)) {
+            this.source_select.append(mk('option', {value: target}, target_name));
         }
-        this.source_ident = EDITOR_TILESET_BUCKET;
-        this.source_select.value = EDITOR_TILESET_BUCKET;
+        this.source_ident = target;
+        this.source_select.value = target;
         this._dirty = false;
+    }
+
+    _unique_source_name(base) {
+        let taken = name => this.sources[name] || BUILTIN_TILESETS[name];
+        if (! taken(base)) return base;
+        for (let i = 2; ; i++) {
+            let cand = `${base} ${i}`;
+            if (! taken(cand)) return cand;
+        }
     }
 
     close() {

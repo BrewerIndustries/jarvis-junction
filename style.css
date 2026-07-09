@@ -649,6 +649,15 @@ table.option-tilesets > tr > .-slot > label {
 table.option-tilesets canvas {
     vertical-align: middle;
 }
+.option-tilesets .-tileset-actions { text-align: left; }
+.option-tilesets .-actions-wrap {
+    display: flex; flex-wrap: wrap; gap: 3px; max-width: 11em;
+}
+.option-tilesets .-tileset-actions button {
+    font-size: 0.78em; padding: 2px 7px; margin: 0;
+}
+.option-tilesets .-tileset-actions button.-danger { color: #d66; }
+.option-tilesets .-tileset-actions button.-danger:hover { color: #fff; background: #c0392b; }
 label.option {
     display: flex;
     align-items: center;

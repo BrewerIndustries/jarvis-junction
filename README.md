@@ -35,14 +35,15 @@ It's static JS with **no build system**: serve the directory and open it in a br
   whole-tileset board (click any cell to edit). **Compare** ghost-overlays a reference set
   (the original Lexy art, or any PNG you load) on the canvas for tracing, with a
   ghost-opacity slider and hold-`\` peek.
-  Edits save live to an *"Edited in-app"* tileset that persists across reloads and is a
-  first-class row in the Tilesets table. Applying registers + selects that row in the open
-  Options dialog, so a subsequent **Save no longer clobbers the edit back to Lexy** (the
-  cause of edits vanishing after reload).
-  An **"Editing:" source picker** in the editor lets you choose which tileset to paint
-  (so you continue your edits instead of always restarting from the base), and an
-  **"Active skin" dropdown** in Options → Tilesets switches the live in-game tileset
-  instantly for every format at once.
+  **Named user tilesets** (not a single shared "Editor" bucket): each is stored
+  independently under its name and enumerated straight from `localStorage`, so nothing
+  gets lost. The Tilesets table gives every set contextual actions — **Duplicate** (any
+  set, prompts for a name), and **Edit / Rename / Delete** for your own. Built-ins are
+  read-only templates: editing one saves the result as a new named copy (Duplicate-on-
+  apply). Applying registers + selects the target row so a later **Save can't clobber it**.
+  The editor's **"Editing:" source picker** chooses which tileset you paint, and an
+  **"Active skin" dropdown** switches the live in-game tileset instantly for every format
+  at once.
 - ⏳ Next (per DESIGN.md): accessibility (colorblind palette, remappable keys),
   progression (medals/Daily Duty), the manor-hub campaign. Original tileset art +
   servers are later.
