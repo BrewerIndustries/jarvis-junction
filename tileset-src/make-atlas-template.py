@@ -71,8 +71,8 @@ def main():
     fnum = load_font(20)
     flabel = load_font(12)
 
-    # very light wash so labels stay legible over the finished art
-    d.rectangle([MARGIN, MARGIN, W, H], fill=(250,246,238,26))
+    # (No dimming wash — ImageDraw fills *replace* pixels rather than compositing,
+    # which would erase the art. The opaque label pills keep names legible.)
 
     # grid
     for i in range(GRID+1):

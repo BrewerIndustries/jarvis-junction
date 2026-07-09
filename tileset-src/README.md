@@ -7,6 +7,33 @@ repainting cells on that grid.
 
 There are three ways in, from "no code" to "regenerate everything".
 
+## How the sheet is laid out
+
+Two zones on the grid:
+
+- **Left block (cols 0–15)** — terrain and items: floors, walls, water/fire/ice,
+  keys, doors, boots, buttons, blocks. Mostly one cell each; a few animate across a
+  row (e.g. `water` = 4 frames).
+- **Right block (cols 16–31)** — the animated actors: `player`, `player2`, and every
+  monster.
+
+For actors the grid is **rows = facing direction, columns = animation frames**:
+
+- **Rows go North, East, South, West** (top → bottom).
+- Columns are the frames for each state. The **player** (cols 16–31, rows 0–3) reads
+  left-to-right: col 16 = standing · cols 16–23 = the 8-frame **walk cycle** ·
+  24–25 = **swimming** · 26–28 = **pushing** · 29 = **skating** (ice/force floor) ·
+  30 = **burned** · 31 = **exited**.
+- Monsters follow the same rule — each creature's block is *directions × walk frames*.
+
+So the cell at **(18, 3)** is *player · walking west · frame 3*. The **View legend**
+button (Options → Tilesets) spells this out for every cell, and the **numbered guide**
+stamps matching numbers onto the sheet. `atlas-template.png` is the printed version of
+the same map.
+
+(Top-left, rows 0–1 cols 0–15, is a bitmap font + digit tiles used for floor letters
+and score numbers — not something you'd normally repaint.)
+
 ## The loop, in one command each
 
 ```bash
@@ -72,6 +99,8 @@ git push origin dev            # updates the dev site
 | `atlas-template.png` | printed map: every tile named at its slot, with col/row rulers |
 | `tile-index.md` | text key: tile → `col,row` → cell count, grouped by category |
 | `tile-cells.json` | machine-readable: tile → every cell it occupies |
+| `tile-index.json` | tile → primary `[col, row, cellCount]` |
+| `tile-descriptions.json` | tile → plain-English "what it does" (used by the in-app legend) |
 | `make-tileset.py` | the procedural generator (one function per tile) |
 | `make-atlas-template.py` | rebuilds the atlas + index from the current sheet |
 | `tileset-tool.py` | `export` / `pack FILE` / `regen` / `atlas` |
