@@ -3104,3 +3104,30 @@ body {
 }
 .dialog-tile-editor .-cell-search { width: 100%; box-sizing: border-box; font-family: monospace; }
 .dialog-tile-editor .-editor-intro { color: #6b5c49; margin: 0 0 12px; }
+
+/* tile editor — added panels (filmstrip, minimap, compare) */
+.dialog-tile-editor .-editor { flex-wrap: wrap; }
+.dialog-tile-editor .-tools button { flex: 1 1 30%; font-size: 1.1em; padding: 4px; }
+.dialog-tile-editor .-actions { display: flex; gap: 5px; }
+.dialog-tile-editor .-actions button { flex: 1; }
+.dialog-tile-editor .-onion { display: flex; align-items: center; gap: 6px; font-size: 0.85em; }
+.dialog-tile-editor .-right { display: flex; flex-direction: column; gap: 8px; width: 210px; flex: 0 0 auto; }
+.dialog-tile-editor .-right h3 { margin: 6px 0 2px; font-size: 0.95em; color: hsl(var(--main-hue), 40%, 35%); }
+.dialog-tile-editor .-ref-select { width: 100%; }
+.dialog-tile-editor .-ref-thumb {
+    image-rendering: pixelated; width: 128px; height: 128px; align-self: center;
+    border: 1px solid #0003; background: #c4b79e;
+    background-image: linear-gradient(45deg,#b8ab92 25%,transparent 25%,transparent 75%,#b8ab92 75%),
+                      linear-gradient(45deg,#b8ab92 25%,transparent 25%,transparent 75%,#b8ab92 75%);
+    background-size: 12px 12px; background-position: 0 0, 6px 6px;
+}
+.dialog-tile-editor .-minimap { image-rendering: pixelated; width: 192px; border: 1px solid #0003; cursor: pointer; }
+.dialog-tile-editor .-hint { font-size: 0.75em; color: var(--muted, #8c7d69); margin: 0; }
+.dialog-tile-editor .-filmstrip { display: flex; gap: 3px; overflow-x: auto; padding: 2px 0; max-width: 100%; }
+.dialog-tile-editor .-frame {
+    image-rendering: pixelated; width: 40px; height: 40px; flex: 0 0 auto;
+    border: 2px solid transparent; border-radius: 2px; cursor: pointer; background: #c4b79e;
+}
+.dialog-tile-editor .-frame:hover { border-color: hsl(var(--main-hue), 50%, 55%); }
+.dialog-tile-editor .-frame.--current { border-color: hsl(var(--main-hue), 80%, 45%); }
+.dialog-tile-editor .-edit.-comparing { border-color: #8a6db5; cursor: not-allowed; }

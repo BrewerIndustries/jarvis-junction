@@ -4034,10 +4034,15 @@ class TileEditorOverlay extends DialogOverlay {
 
         this.cells = compute_cell_labels(tileset);
         this.cell_index = 0;
-        this.zoom = 14;
+        this.zoom = 13;
         this.color = '#caa25a';
         this.tool = 'pencil';
         this._undo = [];
+        this._clip = null;      // copied cell ImageData
+        this.onion = false;
+        this.reference = null;  // a comparison Tileset (read-only)
+        this.comparing = false; // showing the reference in the main canvas
+        this._drag = null;      // {x0,y0,x1,y1} while dragging a line/rect
 
         this._build_ui();
         this._load_cell(0);
@@ -4045,19 +4050,40 @@ class TileEditorOverlay extends DialogOverlay {
         this.add_button("apply", () => this._apply());
         this.add_button("done", () => { this._apply(); this.close(); });
         this.add_button("cancel", () => this.close());
+
+        // Hold "\" to peek at the reference set.
+        this._keydown = ev => {
+            if (ev.key === '\\' && this.reference) { this._set_compare(true); ev.preventDefault(); }
+        };
+        this._keyup = ev => { if (ev.key === '\\') this._set_compare(false); };
+        this.root.addEventListener('keydown', this._keydown);
+        this.root.addEventListener('keyup', this._keyup);
     }
 
     _build_ui() {
         let CV = this.TS * this.zoom;
+
+        // -- tools --
         this.tool_buttons = {};
         let tool_row = mk('div.-tools');
-        for (let [id, label] of [['pencil', '✏ pencil'], ['eraser', '▨ eraser'], ['fill', '🪣 fill'], ['eyedropper', '⦿ pick']]) {
-            let b = mk('button', {type: 'button'}, label);
+        for (let [id, label] of [['pencil','✏'],['eraser','▨'],['line','╱'],['rect','▭'],['fill','🪣'],['eyedropper','⦿']]) {
+            let b = mk('button', {type: 'button', title: id}, label);
             b.addEventListener('click', () => this._set_tool(id));
             this.tool_buttons[id] = b;
             tool_row.append(b);
         }
+        // -- actions --
+        let copy_b = mk('button', {type: 'button'}, "copy");
+        copy_b.addEventListener('click', () => this._copy());
+        this.paste_b = mk('button', {type: 'button', disabled: true}, "paste");
+        this.paste_b.addEventListener('click', () => this._paste());
+        let undo_b = mk('button', {type: 'button'}, "↶ undo");
+        undo_b.addEventListener('click', () => this._undo_pop());
+        // -- onion --
+        this.onion_cb = mk('input', {type: 'checkbox'});
+        this.onion_cb.addEventListener('change', () => { this.onion = this.onion_cb.checked; this._redraw_edit(); });
 
+        // -- palette --
         let pal = mk('div.-palette');
         for (let c of EDITOR_PALETTE) {
             let sw = mk('button.-swatch', {type: 'button', title: c});
@@ -4068,33 +4094,69 @@ class TileEditorOverlay extends DialogOverlay {
         this.color_input = mk('input', {type: 'color', value: this.color});
         this.color_input.addEventListener('input', ev => this._set_color(ev.target.value, false));
 
+        // -- main canvas --
         this.edit_canvas = mk('canvas.-edit', {width: CV, height: CV});
         this.ectx = this.edit_canvas.getContext('2d');
         this.ectx.imageSmoothingEnabled = false;
         this._bind_canvas();
 
+        // -- nav + filmstrip --
         this.cell_label_el = mk('div.-cell-label');
-        let prev = mk('button', {type: 'button'}, "‹ prev");
+        let prev = mk('button', {type: 'button'}, "‹");
         prev.addEventListener('click', () => this._load_cell(this.cell_index - 1));
-        let next = mk('button', {type: 'button'}, "next ›");
+        let next = mk('button', {type: 'button'}, "›");
         next.addEventListener('click', () => this._load_cell(this.cell_index + 1));
-        let undo = mk('button', {type: 'button'}, "↶ undo");
-        undo.addEventListener('click', () => this._undo_pop());
         this.search = mk('input.-cell-search', {type: 'search', placeholder: "find a cell… e.g. player west, key red"});
         this.search.addEventListener('change', () => this._search());
+        this.strip_el = mk('div.-filmstrip');
+
+        // -- reference / compare --
+        this.ref_select = mk('select.-ref-select',
+            mk('option', {value: 'none'}, "no reference"),
+            mk('option', {value: 'lexy'}, "Lexy (original)"),
+            mk('option', {value: 'upload'}, "load a PNG…"));
+        this.ref_select.addEventListener('change', () => this._set_reference(this.ref_select.value));
+        this.ref_file = mk('input', {type: 'file', accept: 'image/*', style: 'display:none'});
+        this.ref_file.addEventListener('change', ev => this._load_reference_file(ev.target.files[0]));
+        this.ref_thumb = mk('canvas.-ref-thumb', {width: this.TS * 4, height: this.TS * 4});
+        this.compare_b = mk('button', {type: 'button', disabled: true}, "◑ compare");
+        this.compare_b.addEventListener('click', () => this._set_compare(! this.comparing));
+
+        // -- minimap --
+        this.map_scale = 6;
+        this.minimap = mk('canvas.-minimap', {width: this.cols * this.map_scale, height: this.rows * this.map_scale});
+        this.minimap.addEventListener('pointerdown', ev => this._minimap_click(ev));
 
         this.main.append(
             mk('p.-editor-intro', "Paint a cell, then ", mk('b', "apply"), " to see it in the game. Cell numbers match the legend."),
             mk('div.-editor',
-                mk('div.-left', tool_row, pal, mk('label.-custom-color', "custom ", this.color_input)),
+                mk('div.-left',
+                    tool_row,
+                    mk('div.-actions', copy_b, this.paste_b, undo_b),
+                    pal,
+                    mk('label.-custom-color', "custom ", this.color_input),
+                    mk('label.-onion', this.onion_cb, " onion skin"),
+                ),
                 mk('div.-center',
-                    mk('div.-nav', prev, this.cell_label_el, next, undo),
+                    mk('div.-nav', prev, this.cell_label_el, next),
                     this.edit_canvas,
-                    this.search),
+                    this.strip_el,
+                    this.search,
+                ),
+                mk('div.-right',
+                    mk('h3', "Compare"),
+                    this.ref_select, this.ref_file,
+                    this.ref_thumb,
+                    this.compare_b,
+                    mk('p.-hint', "hold \\ to peek"),
+                    mk('h3', "Map"),
+                    this.minimap,
+                ),
             ),
         );
         this._set_tool('pencil');
         this._set_color(this.color);
+        this._refresh_minimap();
     }
 
     _set_tool(id) {
@@ -4106,6 +4168,8 @@ class TileEditorOverlay extends DialogOverlay {
         if (update_input && this.color_input) this.color_input.value = c;
     }
 
+    _tile_frames() { return this.cells.filter(c => c.tile === this.cell.tile); }
+
     _load_cell(idx) {
         if (this.cells.length === 0) return;
         this.cell_index = (idx + this.cells.length) % this.cells.length;
@@ -4114,6 +4178,9 @@ class TileEditorOverlay extends DialogOverlay {
         this.cell_label_el.textContent =
             `#${this.cell.n} · ${this.cell.tile}${this.cell.label ? ' · ' + this.cell.label : ''} (${this.cell.c},${this.cell.r})`;
         this._redraw_edit();
+        this._refresh_filmstrip();
+        this._refresh_reference();
+        this._refresh_minimap();
     }
 
     _search() {
@@ -4125,21 +4192,91 @@ class TileEditorOverlay extends DialogOverlay {
         if (hit >= 0) this._load_cell(hit);
     }
 
+    // draw one cell of some image into a target ctx scaled to fill
+    _blit_cell(ctx, image, c, r, dw, dh) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(image, c * this.TS, r * this.TS, this.TS, this.TS, 0, 0, dw, dh);
+    }
+
     _redraw_edit() {
-        let CV = this.edit_canvas.width, TS = this.TS, s = this.zoom, ctx = this.ectx;
+        let CV = this.edit_canvas.width, TS = this.TS, s = this.zoom, ctx = this.ectx, cell = this.cell;
         ctx.clearRect(0, 0, CV, CV);
         for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
             ctx.fillStyle = ((x + y) & 1) ? '#d7ccb8' : '#c4b79e';
             ctx.fillRect(x * s, y * s, s, s);
         }
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(this.sheet, this.cell.c * TS, this.cell.r * TS, TS, TS, 0, 0, CV, CV);
+
+        if (this.comparing && this.reference) {
+            this._blit_cell(ctx, this.reference.image, cell.c, cell.r, CV, CV);
+        }
+        else {
+            // onion skin: ghost the neighbouring frames of this tile
+            if (this.onion) {
+                let frames = this._tile_frames();
+                let idx = frames.findIndex(f => f.c === cell.c && f.r === cell.r);
+                ctx.globalAlpha = 0.28;
+                for (let n of [frames[idx - 1], frames[idx + 1]]) {
+                    if (n) this._blit_cell(ctx, this.sheet, n.c, n.r, CV, CV);
+                }
+                ctx.globalAlpha = 1;
+            }
+            this._blit_cell(ctx, this.sheet, cell.c, cell.r, CV, CV);
+            // preview a line/rect while dragging
+            if (this._drag) {
+                ctx.fillStyle = this.tool === 'eraser' ? 'rgba(220,60,60,0.6)' : this.color;
+                for (let [x, y] of this._shape_points(this._drag)) ctx.fillRect(x * s, y * s, s, s);
+            }
+        }
+
         ctx.strokeStyle = 'rgba(0,0,0,0.14)';
         ctx.lineWidth = 1;
         for (let i = 0; i <= TS; i++) {
             ctx.beginPath(); ctx.moveTo(i*s + 0.5, 0); ctx.lineTo(i*s + 0.5, CV); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, i*s + 0.5); ctx.lineTo(CV, i*s + 0.5); ctx.stroke();
         }
+    }
+
+    _refresh_filmstrip() {
+        this.strip_el.textContent = '';
+        let frames = this._tile_frames();
+        if (frames.length <= 1) return;
+        for (let f of frames) {
+            let c = mk('canvas.-frame', {width: this.TS * 2, height: this.TS * 2});
+            this._blit_cell(c.getContext('2d'), this.sheet, f.c, f.r, this.TS * 2, this.TS * 2);
+            if (f === this.cell) c.classList.add('--current');
+            c.title = f.label || f.tile;
+            c.addEventListener('click', () => this._load_cell(this.cells.indexOf(f)));
+            this.strip_el.append(c);
+        }
+    }
+
+    _refresh_reference() {
+        let ctx = this.ref_thumb.getContext('2d');
+        ctx.clearRect(0, 0, this.ref_thumb.width, this.ref_thumb.height);
+        if (this.reference) {
+            this._blit_cell(ctx, this.reference.image, this.cell.c, this.cell.r, this.ref_thumb.width, this.ref_thumb.height);
+        }
+    }
+
+    _refresh_minimap() {
+        let ctx = this.minimap.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, this.minimap.width, this.minimap.height);
+        ctx.drawImage(this.sheet, 0, 0, this.minimap.width, this.minimap.height);
+        if (this.cell) {
+            ctx.strokeStyle = '#e8c46a';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.cell.c * this.map_scale, this.cell.r * this.map_scale, this.map_scale, this.map_scale);
+        }
+    }
+
+    _minimap_click(ev) {
+        let r = this.minimap.getBoundingClientRect();
+        let col = Math.floor((ev.clientX - r.x) / (r.width / this.cols));
+        let row = Math.floor((ev.clientY - r.y) / (r.height / this.rows));
+        let hit = this.cells.findIndex(c => c.c === col && c.r === row);
+        if (hit >= 0) this._load_cell(hit);
     }
 
     _bind_canvas() {
@@ -4154,26 +4291,68 @@ class TileEditorOverlay extends DialogOverlay {
             ev.preventDefault();
             let [px, py] = to_px(ev);
             if (this.tool === 'eyedropper') { this._pick(px, py); return; }
+            if (this.comparing) return;  // reference is read-only
+            if (this.tool === 'line' || this.tool === 'rect') {
+                this._push_undo();
+                this._drag = {x0: px, y0: py, x1: px, y1: py};
+                this._redraw_edit();
+                return;
+            }
             this._push_undo();
             if (this.tool === 'fill') { this._flood(px, py); }
             else { painting = true; this._paint(px, py); }
         });
         this.edit_canvas.addEventListener('pointermove', ev => {
-            if (painting) { let [px, py] = to_px(ev); this._paint(px, py); }
+            let [px, py] = to_px(ev);
+            if (this._drag) { this._drag.x1 = px; this._drag.y1 = py; this._redraw_edit(); }
+            else if (painting) { this._paint(px, py); }
         });
-        window.addEventListener('pointerup', () => { painting = false; });
+        window.addEventListener('pointerup', () => {
+            if (this._drag) {
+                for (let [x, y] of this._shape_points(this._drag)) this._set_pixel(x, y);
+                this._drag = null;
+                this._redraw_edit();
+                this._refresh_filmstrip();
+                this._refresh_minimap();
+            }
+            if (painting) { painting = false; this._refresh_filmstrip(); this._refresh_minimap(); }
+        });
     }
 
     _sheet_xy(px, py) { return [this.cell.c * this.TS + px, this.cell.r * this.TS + py]; }
 
-    _paint(px, py) {
+    _set_pixel(px, py) {
         let [gx, gy] = this._sheet_xy(px, py);
         this.sctx.clearRect(gx, gy, 1, 1);
         if (this.tool !== 'eraser') {
             this.sctx.fillStyle = this.color;
             this.sctx.fillRect(gx, gy, 1, 1);
         }
-        this._redraw_edit();
+    }
+    _paint(px, py) { this._set_pixel(px, py); this._redraw_edit(); }
+
+    // Bresenham line / rectangle outline points within the cell
+    _shape_points(d) {
+        let pts = [];
+        if (this.tool === 'rect') {
+            let x0 = Math.min(d.x0, d.x1), x1 = Math.max(d.x0, d.x1);
+            let y0 = Math.min(d.y0, d.y1), y1 = Math.max(d.y0, d.y1);
+            for (let x = x0; x <= x1; x++) { pts.push([x, y0], [x, y1]); }
+            for (let y = y0; y <= y1; y++) { pts.push([x0, y], [x1, y]); }
+            return pts;
+        }
+        // line
+        let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
+        let dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+        let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+        while (true) {
+            pts.push([x0, y0]);
+            if (x0 === x1 && y0 === y1) break;
+            let e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+        return pts;
     }
 
     _pick(px, py) {
@@ -4206,6 +4385,54 @@ class TileEditorOverlay extends DialogOverlay {
         }
         this.sctx.putImageData(region, ox, oy);
         this._redraw_edit();
+        this._refresh_minimap();
+    }
+
+    _copy() {
+        this._clip = this.sctx.getImageData(this.cell.c * this.TS, this.cell.r * this.TS, this.TS, this.TS);
+        this.paste_b.disabled = false;
+    }
+    _paste() {
+        if (! this._clip) return;
+        this._push_undo();
+        this.sctx.putImageData(this._clip, this.cell.c * this.TS, this.cell.r * this.TS);
+        this._redraw_edit();
+        this._refresh_filmstrip();
+        this._refresh_minimap();
+    }
+
+    _set_reference(kind) {
+        if (kind === 'none') { this.reference = null; this._set_compare(false); this.compare_b.disabled = true; this._refresh_reference(); return; }
+        if (kind === 'upload') { this.ref_file.click(); return; }
+        if (kind === 'lexy') {
+            let img = mk('img');
+            img.src = 'reference-lexy.png';
+            img.decode().then(() => {
+                this.reference = new Tileset(img, this.layout, this.TS, this.TS);
+                this.compare_b.disabled = false;
+                this._refresh_reference();
+            }).catch(() => {});
+        }
+    }
+    _load_reference_file(file) {
+        if (! file) return;
+        let reader = new FileReader;
+        reader.onload = () => {
+            let img = mk('img');
+            img.src = reader.result;
+            img.decode().then(() => {
+                this.reference = new Tileset(img, this.layout, this.TS, this.TS);
+                this.compare_b.disabled = false;
+                this._refresh_reference();
+            }).catch(() => {});
+        };
+        reader.readAsDataURL(file);
+    }
+    _set_compare(on) {
+        this.comparing = on && !! this.reference;
+        this.compare_b.classList.toggle('--pressed', this.comparing);
+        this.edit_canvas.classList.toggle('-comparing', this.comparing);
+        this._redraw_edit();
     }
 
     _push_undo() {
@@ -4218,6 +4445,8 @@ class TileEditorOverlay extends DialogOverlay {
         let [ox, oy] = this._sheet_xy(0, 0);
         this.sctx.putImageData(this._undo.pop(), ox, oy);
         this._redraw_edit();
+        this._refresh_filmstrip();
+        this._refresh_minimap();
     }
 
     _apply() {
@@ -4239,6 +4468,12 @@ class TileEditorOverlay extends DialogOverlay {
         });
         for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = 'Editor';
         this.conductor.save_stash();
+    }
+
+    close() {
+        this.root.removeEventListener('keydown', this._keydown);
+        this.root.removeEventListener('keyup', this._keyup);
+        super.close();
     }
 }
 class CompatOverlay extends DialogOverlay {
