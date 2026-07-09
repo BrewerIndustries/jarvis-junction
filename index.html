@@ -141,11 +141,10 @@
     </defs>
     </svg>
     <header id="header-main">
-        <img id="header-icon" src="icon.png" alt="">
+        <img id="header-icon" src="butler.png" alt="">
         <h1>Jarvis's Junction</h1>
-        <p>— inspired by <a href="https://github.com/eevee/lexys-labyrinth">Lexy's Labyrinth</a></p>
         <nav>
-            <button id="main-compat" type="button"><img src="icons/compat-lexy.png" alt=""> <output>Jarvis</output></button>
+            <button id="main-compat" type="button">mode</button>
             <button id="main-options" type="button">options</button>
         </nav>
     </header>
@@ -190,7 +189,7 @@
     </script>
     <main id="splash" hidden>
         <header>
-            <img src="og-preview.png" alt="">
+            <img src="butler.png" alt="">
             <h1>Jarvis's Junction</h1>
             <p>the duties of a most dutiful butler — every level another task for the Master of the House</p>
             <button id="splash-fullscreen" type="button" title="Toggle fullscreen">
@@ -202,14 +201,13 @@
                 </svg>
             </button>
         </header>
+        <p id="splash-premise">Good day. You are <strong>Jarvis</strong>, butler to the Master of the House — and the household never runs itself. Each level is a duty on today's list: collect what's needed, mind the hazards below stairs, and see yourself to the door. Ring the bell (press a key) to begin your service.</p>
+
         <div id="splash-links">
             <a href="https://github.com/BrewerIndustries/jarvis-junction">About</a>
             <a href="https://github.com/BrewerIndustries/jarvis-junction#readme">How to play</a>
             <a href="https://github.com/BrewerIndustries/jarvis-junction">Source code and more</a>
         </div>
-        <p id="splash-disclaimer"><strong>Chip's Challenge</strong> is a registered trademark of Bridgestone Media Group LLC, used here for identification purposes only.  Not affiliated with, sponsored, or endorsed by Bridgestone Media Group LLC.</p>
-
-        <p id="splash-premise">Good day. You are <strong>Jarvis</strong>, butler to the Master of the House — and the household never runs itself. Each level is a duty on today's list: collect what's needed, mind the hazards below stairs, and see yourself to the door. Ring the bell (press a key) to begin your service.</p>
 
         <section id="splash-stock-levels">
             <h2>Today's duties</h2>
@@ -237,6 +235,7 @@
                 <button type="button" id="splash-create-level" class="button-big button-bright">New scratch level<br>(won't be saved!)</button>
             </div>
         </section>
+        <p id="splash-disclaimer"><strong>Chip's Challenge</strong> is a registered trademark of Bridgestone Media Group LLC, used here for identification purposes only.  Not affiliated with, sponsored, or endorsed by Bridgestone Media Group LLC.</p>
         <div class="drag-overlay"></div>
     </main>
     <main id="player" hidden>

@@ -3559,6 +3559,15 @@ class OptionsOverlay extends DialogOverlay {
             this._load_custom_tileset(ev.target.files[0]);
         });
 
+        // Credits / attribution (kept off the front page, surfaced here instead)
+        this.main.append(
+            mk('h2', "About"),
+            mk('p.-about',
+                "Jarvis's Junction is inspired by ",
+                mk('a', {href: 'https://github.com/eevee/lexys-labyrinth', target: '_blank'}, "Lexy's Labyrinth"),
+                " by eevee — an open-source, Chip's Challenge–compatible engine (MIT), with original art & music under CC BY-SA 4.0."),
+        );
+
         // Load current values
         this.root.elements['touch-mode'].value = this.conductor.options.touch_mode ?? 'swipe';
         this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
@@ -5630,8 +5639,9 @@ class Conductor {
             this._compat_ruleset = ruleset;
         }
 
-        document.querySelector('#main-compat img').src = `icons/compat-${ruleset}.png`;
-        document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[ruleset];
+        // The mode button no longer shows an icon/label; reflect the current ruleset in its tooltip.
+        let compat_button = document.querySelector('#main-compat');
+        if (compat_button) compat_button.title = `Rules: ${COMPAT_RULESET_LABELS[ruleset]}`;
 
         this.compat = flags;
     }

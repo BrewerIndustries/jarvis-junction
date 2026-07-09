@@ -828,9 +828,10 @@ pre.stack-trace {
     display: grid;
     grid:
         "header header"
+        "premise premise"
         "links  links"
-        "disclaimer disclaimer"
         "stock  yours"
+        "disclaimer disclaimer"
         / 3fr minmax(18em, 1fr)
     ;
     gap: 1em;
@@ -885,6 +886,9 @@ pre.stack-trace {
 #splash > header img {
     grid-area: image;
     align-self: center;
+    width: 96px;
+    height: 96px;
+    image-rendering: pixelated;
 }
 #splash > header h1 {
     grid-area: title;
@@ -982,6 +986,7 @@ pre.stack-trace {
     }
     #splash > header img {
         width: 48px;
+        height: 48px;
     }
     #splash > header h1 {
         font-size: 1.5em;
@@ -3003,7 +3008,7 @@ body {
 
 /* The Master's note — the butler premise, styled as a warm card */
 #splash-premise {
-    grid-column: 1 / -1;
+    grid-area: premise;
     max-width: 52em;
     margin: 0 auto;
     padding: 0.85em 1.15em;

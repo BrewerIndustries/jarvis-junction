@@ -21,7 +21,10 @@ It's static JS with **no build system**: serve the directory and open it in a br
 - ✅ **Diegetic butler theme**: warm brass/manor palette + serif type, "Master's
   note" splash, rebranded packs ("inspired by Chip's Challenge"), in-game pack-name
   override, butler UI labels (begin duty / duty roster / gratuity), and butler
-  death/win messages.
+  death/win messages. Front page uses the **butler sprite** (`butler.png`) as the logo
+  (top splash + bottom bar); the "mode" (compat) button is text-only; the Lexy's
+  Labyrinth credit moved to Options → About and the Chip's Challenge trademark notice
+  to the foot of the splash.
 - ✅ **Game-feel juice** (`js/juice.js`): pickup particles, socket/bomb/death
   screen-shake, "duty complete" confetti, mobile haptics — all off the sfx event
   hook, honoring `prefers-reduced-motion`; plus a game-speed slider, effects
