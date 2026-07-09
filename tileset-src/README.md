@@ -43,9 +43,15 @@ guide and save at the full **1024×1024** size.
 ## Uploading live in-game (fastest, no rebuild)
 
 The game reads any square 32×32-grid PNG as this ("Jarvis") layout. So you can
-preview an edit instantly:
+preview an edit instantly. **Options → Tilesets** has the whole loop built in:
 
-**Options → Tilesets → Load custom tileset →** pick your edited `tileset.png`.
+- **⤓ Download tileset** — the sheet to paint.
+- **⤓ Download numbered guide** — a transparent overlay that numbers every cell;
+  lay it on top while you paint.
+- **View legend** — a page listing every numbered cell with its thumbnail, exactly
+  what it is (e.g. `player — moving · west · #3`, `ice corner SE`), and what the
+  tile does. Searchable. The numbers match the guide.
+- **Load custom tileset →** pick your edited `tileset.png` to apply it live.
 
 It's applied immediately and remembered in your browser. Great for iterating.
 To make it everyone's default, `pack` it and redeploy (below).

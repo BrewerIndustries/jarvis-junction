@@ -3502,14 +3502,16 @@ class OptionsOverlay extends DialogOverlay {
         custom_tileset_button.addEventListener('click', () => this.root.elements['custom-tileset'].click());
         let dl_tileset_button = mk('button', {type: 'button'}, "⤓ Download tileset");
         dl_tileset_button.addEventListener('click', () => this._download_tileset());
-        let dl_guide_button = mk('button', {type: 'button'}, "⤓ Download label guide");
+        let dl_guide_button = mk('button', {type: 'button'}, "⤓ Download numbered guide");
         dl_guide_button.addEventListener('click', () => this._download_guide());
+        let legend_button = mk('button', {type: 'button'}, "View legend");
+        legend_button.addEventListener('click', () => this._view_legend());
         this.main.append(
             mk('p.-reskin-intro',
                 "Reskin the game: ", mk('b', "download"), " the tileset, paint over its 32×32 cells in any image editor, then ",
                 mk('b', "load"), " it back."),
-            mk('p', dl_tileset_button, " ", dl_guide_button,
-                " — a 1024×1024 sheet, plus a labelled overlay you can lay on top while you paint."),
+            mk('p', dl_tileset_button, " ", dl_guide_button, " ", legend_button,
+                " — the sheet, an overlay numbering every cell, and a legend saying what each number is."),
             mk('p',
                 mk('input', {type: 'file', name: 'custom-tileset'}),
                 custom_tileset_button,
@@ -3680,35 +3682,52 @@ class OptionsOverlay extends DialogOverlay {
         canvas.toBlob(blob => this._download_blob(blob, "jarvis-junction-tileset.png"));
     }
 
-    // Walk a tileset layout into { name: [[col,row], ...] } of integer grid cells.
-    _layout_cells(layout, cols, rows) {
-        let out = {};
+    // Walk a tileset layout into an ordered, numbered list of every cell, with a
+    // human label derived from the path to it (state / direction / frame). e.g.
+    // { n: 2, c: 17, r: 0, tile: 'player', label: 'moving · north · #2' }.
+    _cell_labels() {
+        let ts = this._reskin_source();
+        if (! ts) return [];
+        let img = ts.image;
+        let cols = Math.round((img.naturalWidth || img.width) / ts.size_x);
+        let rows = Math.round((img.naturalHeight || img.height) / ts.size_y);
         const SKIP = new Set(['__special__', 'modes', 'is_wired_optional', 'duration',
-            'cc2_duration', 'positionally_hashed', 'scroll_region', '_distinct']);
-        let walk = (name, v) => {
-            if (Array.isArray(v)) {
-                if (v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number') {
-                    if (Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] < cols && v[1] < rows) {
-                        (out[name] = out[name] || []).push([v[0], v[1]]);
-                    }
+            'cc2_duration', 'positionally_hashed', 'scroll_region', '_distinct', 'global']);
+        const WRAP = new Set(['all', 'normal']);  // structural keys not worth showing
+        let claimed = {};
+        let walk = (tile, node, path) => {
+            if (Array.isArray(node)) {
+                if (node.length === 2 && Number.isInteger(node[0]) && Number.isInteger(node[1])
+                    && node[0] < cols && node[1] < rows)
+                {
+                    let key = node[0] + ',' + node[1];
+                    if (! (key in claimed)) claimed[key] = { tile, label: path.join(' · ') };
                     return;
                 }
-                for (let e of v) walk(name, e);
+                node.forEach((e, i) => walk(tile, e, path.concat('#' + (i + 1))));
                 return;
             }
-            if (v && typeof v === 'object') {
-                for (let [k, val] of Object.entries(v)) {
+            if (node && typeof node === 'object') {
+                for (let [k, v] of Object.entries(node)) {
                     if (k[0] === '#' || SKIP.has(k)) continue;
-                    walk(name, val);
+                    walk(tile, v, WRAP.has(k) ? path : path.concat(k));
                 }
             }
         };
-        for (let [name, v] of Object.entries(layout)) {
-            if (name[0] !== '#') walk(name, v);
+        for (let [name, v] of Object.entries(ts.layout)) {
+            if (name[0] !== '#') walk(name, v, []);
         }
-        return out;
+        let cells = Object.entries(claimed).map(([k, info]) => {
+            let [c, r] = k.split(',').map(Number);
+            return { c, r, tile: info.tile, label: info.label };
+        });
+        cells.sort((a, b) => a.r - b.r || a.c - b.c);
+        cells.forEach((cell, i) => cell.n = i + 1);
+        return cells;
     }
 
+    // A transparent overlay with each cell's NUMBER — lay it over the downloaded
+    // tileset while you paint, and look the number up in the legend.
     _download_guide() {
         let ts = this._reskin_source();
         if (! ts) return;
@@ -3718,24 +3737,81 @@ class OptionsOverlay extends DialogOverlay {
         let cols = Math.round(w / sx), rows = Math.round(h / sy);
         let canvas = mk('canvas', {width: w, height: h});
         let ctx = canvas.getContext('2d');
-        // Transparent overlay: grid + each tile named at its slot. Lay this on top
-        // of the downloaded tileset as a reference layer, then hide it before saving.
-        ctx.strokeStyle = 'rgba(30,24,20,0.35)';
+        ctx.strokeStyle = 'rgba(30,24,20,0.4)';
         ctx.lineWidth = 1;
         for (let i = 0; i <= cols; i++) { ctx.beginPath(); ctx.moveTo(i*sx + 0.5, 0); ctx.lineTo(i*sx + 0.5, h); ctx.stroke(); }
         for (let j = 0; j <= rows; j++) { ctx.beginPath(); ctx.moveTo(0, j*sy + 0.5); ctx.lineTo(w, j*sy + 0.5); ctx.stroke(); }
-        ctx.font = '7px monospace';
-        ctx.textBaseline = 'top';
-        let cells = this._layout_cells(ts.layout, cols, rows);
-        for (let [name, list] of Object.entries(cells)) {
-            for (let [c, r] of list) {
-                ctx.fillStyle = 'rgba(20,16,12,0.72)';
-                ctx.fillRect(c*sx, r*sy, sx, 8);
-                ctx.fillStyle = '#ffe0b0';
-                ctx.fillText(name.slice(0, 8), c*sx + 1, r*sy + 1);
-            }
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let cell of this._cell_labels()) {
+            let cx = cell.c*sx + sx/2, cy = cell.r*sy + sy/2;
+            ctx.fillStyle = 'rgba(20,16,12,0.78)';
+            ctx.fillRect(cell.c*sx + 1, cy - 6, sx - 2, 12);
+            ctx.fillStyle = '#ffe6b0';
+            ctx.fillText(String(cell.n), cx, cy);
         }
         canvas.toBlob(blob => this._download_blob(blob, "jarvis-junction-guide.png"));
+    }
+
+    // Open a printable legend page: number -> thumbnail of that exact cell ->
+    // what it is (tile + state/direction/frame) -> what the tile does.
+    async _view_legend() {
+        let ts = this._reskin_source();
+        if (! ts) return;
+        let cells = this._cell_labels();
+        // per-tile descriptions (best effort; the page still works without them)
+        let descs = {};
+        try { descs = await (await fetch('tileset-src/tile-descriptions.json')).json(); }
+        catch (e) { descs = {}; }
+
+        let img = ts.image, sx = ts.size_x, sy = ts.size_y, TH = 3;  // 3x thumbnails
+        let tc = mk('canvas', {width: sx*TH, height: sy*TH});
+        let tctx = tc.getContext('2d');
+        tctx.imageSmoothingEnabled = false;
+
+        let rows_html = cells.map(cell => {
+            tctx.clearRect(0, 0, tc.width, tc.height);
+            tctx.drawImage(img, cell.c*sx, cell.r*sy, sx, sy, 0, 0, sx*TH, sy*TH);
+            let thumb = tc.toDataURL();
+            let what = cell.tile + (cell.label ? ' — ' + cell.label : '');
+            let desc = descs[cell.tile] || '';
+            return `<tr><td class="n">${cell.n}</td>`
+                + `<td><img src="${thumb}" width="${sx*TH}" height="${sy*TH}"></td>`
+                + `<td class="rc">${cell.c},${cell.r}</td>`
+                + `<td class="what">${what}</td>`
+                + `<td class="desc">${desc}</td></tr>`;
+        }).join('');
+
+        let html = `<!doctype html><meta charset=utf8><title>Jarvis's Junction — tile legend</title>
+<style>
+  body{font:14px/1.5 system-ui,sans-serif;background:#f4eee2;color:#33261a;margin:0;padding:24px}
+  h1{font:600 26px Georgia,serif;margin:0 0 4px}
+  p{color:#6b5c49;margin:0 0 16px;max-width:70ch}
+  input{font:14px monospace;padding:8px 12px;border:1px solid #d9ccb4;border-radius:8px;width:260px;margin-bottom:16px}
+  table{border-collapse:collapse;width:100%}
+  td,th{padding:6px 10px;border-bottom:1px solid #e6dcc9;vertical-align:middle;text-align:left}
+  th{position:sticky;top:0;background:#f4eee2;font:600 12px system-ui;text-transform:uppercase;letter-spacing:.05em;color:#8c7d69}
+  td.n{font:600 15px monospace;color:#ad6543;font-variant-numeric:tabular-nums}
+  td.rc{font:12px monospace;color:#b6a891}
+  td.what{font:13px monospace}
+  td.desc{color:#5c4e3e}
+  img{image-rendering:pixelated;border:1px solid #d9ccb4;background:#fff;display:block}
+</style>
+<h1>Tile legend — Jarvis's Junction</h1>
+<p>Every cell of the tileset, numbered top-to-bottom. The number matches the guide overlay
+(⤓ download guide). Paint the sprite shown into that cell. <b>${cells.length}</b> cells total.</p>
+<input id="q" placeholder="filter… e.g. player, ice, walking">
+<table><thead><tr><th>#</th><th>tile</th><th>col,row</th><th>what it is</th><th>what it does</th></tr></thead>
+<tbody id="b">${rows_html}</tbody></table>
+<script>
+  const q=document.getElementById('q'), rows=[...document.querySelectorAll('#b tr')];
+  q.addEventListener('input',()=>{const t=q.value.toLowerCase();for(const r of rows){r.style.display=r.textContent.toLowerCase().includes(t)?'':'none';}});
+</script>`;
+        let blob = new Blob([html], { type: 'text/html' });
+        let url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
 
     async _load_custom_tileset(file) {
