@@ -3130,4 +3130,4 @@ body {
 }
 .dialog-tile-editor .-frame:hover { border-color: hsl(var(--main-hue), 50%, 55%); }
 .dialog-tile-editor .-frame.--current { border-color: hsl(var(--main-hue), 80%, 45%); }
-.dialog-tile-editor .-edit.-comparing { border-color: #8a6db5; cursor: not-allowed; }
+.dialog-tile-editor .-edit.-comparing { border-color: #8a6db5; box-shadow: 0 0 0 2px #8a6db555; }

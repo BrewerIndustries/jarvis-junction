@@ -4207,26 +4207,28 @@ class TileEditorOverlay extends DialogOverlay {
         }
         ctx.imageSmoothingEnabled = false;
 
-        if (this.comparing && this.reference) {
-            this._blit_cell(ctx, this.reference.image, cell.c, cell.r, CV, CV);
+        // onion skin: ghost the neighbouring frames of this tile
+        if (this.onion) {
+            let frames = this._tile_frames();
+            let idx = frames.findIndex(f => f.c === cell.c && f.r === cell.r);
+            ctx.globalAlpha = 0.28;
+            for (let n of [frames[idx - 1], frames[idx + 1]]) {
+                if (n) this._blit_cell(ctx, this.sheet, n.c, n.r, CV, CV);
+            }
+            ctx.globalAlpha = 1;
         }
-        else {
-            // onion skin: ghost the neighbouring frames of this tile
-            if (this.onion) {
-                let frames = this._tile_frames();
-                let idx = frames.findIndex(f => f.c === cell.c && f.r === cell.r);
-                ctx.globalAlpha = 0.28;
-                for (let n of [frames[idx - 1], frames[idx + 1]]) {
-                    if (n) this._blit_cell(ctx, this.sheet, n.c, n.r, CV, CV);
-                }
-                ctx.globalAlpha = 1;
-            }
-            this._blit_cell(ctx, this.sheet, cell.c, cell.r, CV, CV);
-            // preview a line/rect while dragging
-            if (this._drag) {
-                ctx.fillStyle = this.tool === 'eraser' ? 'rgba(220,60,60,0.6)' : this.color;
-                for (let [x, y] of this._shape_points(this._drag)) ctx.fillRect(x * s, y * s, s, s);
-            }
+        // your edit
+        this._blit_cell(ctx, this.sheet, cell.c, cell.r, CV, CV);
+        // preview a line/rect while dragging
+        if (this._drag) {
+            ctx.fillStyle = this.tool === 'eraser' ? 'rgba(220,60,60,0.6)' : this.color;
+            for (let [x, y] of this._shape_points(this._drag)) ctx.fillRect(x * s, y * s, s, s);
+        }
+        // reference ghost overlaid on top, for tracing
+        if (this.comparing && this.reference) {
+            ctx.globalAlpha = 0.5;
+            this._blit_cell(ctx, this.reference.image, cell.c, cell.r, CV, CV);
+            ctx.globalAlpha = 1;
         }
 
         ctx.strokeStyle = 'rgba(0,0,0,0.14)';
@@ -4291,7 +4293,6 @@ class TileEditorOverlay extends DialogOverlay {
             ev.preventDefault();
             let [px, py] = to_px(ev);
             if (this.tool === 'eyedropper') { this._pick(px, py); return; }
-            if (this.comparing) return;  // reference is read-only
             if (this.tool === 'line' || this.tool === 'rect') {
                 this._push_undo();
                 this._drag = {x0: px, y0: py, x1: px, y1: py};
