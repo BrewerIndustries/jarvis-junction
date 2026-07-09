@@ -3126,7 +3126,11 @@ body {
 .dialog-tile-editor .-minimap { image-rendering: pixelated; width: 384px; max-width: 100%; border: 1px solid #0003; cursor: pointer; display: block; }
 .dialog-tile-editor .-board-label { font-family: monospace; font-size: 12px; color: hsl(var(--main-hue), 30%, 35%); margin-top: 5px; min-height: 1.1em; }
 .dialog-tile-editor .-hint { font-size: 0.75em; color: var(--muted, #8c7d69); margin: 0; }
-.dialog-tile-editor .-filmstrip { display: flex; gap: 3px; overflow-x: auto; padding: 2px 0; max-width: 100%; }
+/* width:0 + min-width:100% stops the (potentially 65-frame) strip's intrinsic width
+   from blowing out the flex column — it fills the canvas width and scrolls instead. */
+.dialog-tile-editor .-filmstrip { display: flex; gap: 3px; overflow-x: auto; padding: 2px 0; width: 0; min-width: 100%; }
+.dialog-tile-editor .-center { align-items: flex-start; }
+.dialog-tile-editor .-nav, .dialog-tile-editor .-cell-search { align-self: stretch; }
 .dialog-tile-editor .-frame {
     image-rendering: pixelated; width: 40px; height: 40px; flex: 0 0 auto;
     border: 2px solid transparent; border-radius: 2px; cursor: pointer; background: #c4b79e;
@@ -3138,3 +3142,7 @@ body {
 .dialog-tile-editor .-ghost-slider { flex: 1; min-width: 0; accent-color: #8a6db5; }
 .dialog-tile-editor .-ghost-slider:disabled { opacity: 0.4; }
 .option-tilesets .-tileset-name { font-weight: 600; color: hsl(var(--main-hue), 35%, 38%); }
+.-active-skin-row { margin: 0 0 10px; }
+.-active-skin-row .-active-skin { margin-left: 4px; min-width: 12em; }
+.dialog-tile-editor .-source { display: flex; align-items: center; gap: 6px; font-size: 0.9em; font-weight: 600; color: hsl(var(--main-hue), 35%, 35%); }
+.dialog-tile-editor .-source-select { flex: 1; min-width: 0; }

@@ -33,6 +33,10 @@ It's static JS with **no build system**: serve the directory and open it in a br
   you load) on the canvas for tracing, with a ghost-opacity slider and hold-`\` peek.
   Edits save live to an *"Edited in-app"* tileset that persists across reloads and is a
   first-class row in the Tilesets table (so hitting Save no longer drops it back to Lexy).
+  An **"Editing:" source picker** in the editor lets you choose which tileset to paint
+  (so you continue your edits instead of always restarting from the base), and an
+  **"Active skin" dropdown** in Options → Tilesets switches the live in-game tileset
+  instantly for every format at once.
 - ⏳ Next (per DESIGN.md): accessibility (colorblind palette, remappable keys),
   progression (medals/Daily Duty), the manor-hub campaign. Original tileset art +
   servers are later.

@@ -3511,6 +3511,17 @@ class OptionsOverlay extends DialogOverlay {
         for (let [ident, def] of Object.entries(this.available_tilesets)) {
             this._add_tileset_row(ident, def);
         }
+
+        // Quick in-game skin selector: switch the active tileset instantly, for all
+        // formats at once. (The table below still allows per-format control + Save.)
+        this.active_skin_select = mk('select.-active-skin');
+        this._populate_active_skin_select();
+        this.active_skin_select.addEventListener('change',
+            () => this._select_active_skin(this.active_skin_select.value));
+        this.tileset_table.before(mk('p.-active-skin-row',
+            mk('label', mk('b', "Active skin: "), this.active_skin_select),
+            " — switches instantly; fine-tune per format in the table below, then Save."));
+
         this.custom_tileset_counter = 1;
         // FIXME allow drag-drop into...  this window?  area?  idk
         let custom_tileset_button = mk('button', {type: 'button'}, "Load custom tileset");
@@ -3523,8 +3534,11 @@ class OptionsOverlay extends DialogOverlay {
         legend_button.addEventListener('click', () => this._view_legend());
         let edit_button = mk('button.button-bright', {type: 'button'}, "✎ Edit tiles in-app");
         edit_button.addEventListener('click', () => {
-            let ts = this._reskin_source();
-            if (ts) new TileEditorOverlay(this.conductor, ts).open();
+            // Continue editing whatever skin is currently active (so applied edits aren't
+            // lost); the editor itself lets you switch which tileset you're painting.
+            let active = this.conductor.options.tilesets['ll'];
+            let initial = this.available_tilesets[active] ? active : 'lexy';
+            new TileEditorOverlay(this.conductor, this.available_tilesets, initial).open();
         });
         this.main.append(
             mk('p.-reskin-intro',
@@ -3676,6 +3690,48 @@ class OptionsOverlay extends DialogOverlay {
                 convert_tileset_to_layout(def.tileset, 'tw-animated');
             }),
         ));
+    }
+
+    // ---- Quick "active skin" selector (live, drives all slots) -------------
+    _populate_active_skin_select() {
+        let sel = this.active_skin_select;
+        sel.textContent = '';
+        let active = this.conductor.options.tilesets['ll'] ?? 'lexy';
+        for (let [ident, def] of Object.entries(this.available_tilesets)) {
+            if (! def.tileset.layout['#supported-versions'].has('ll')) continue;
+            let opt = mk('option', {value: ident}, def.name || ident);
+            if (ident === active) opt.selected = true;
+            sel.append(opt);
+        }
+    }
+    _select_active_skin(ident) {
+        let def = this.available_tilesets[ident];
+        if (! def) return;
+        // Built-in and already-stored sets can be persisted right away; a freshly-uploaded
+        // one has no storage bucket yet, so just preview it live and let Save file it away.
+        let persist = def.is_builtin || def.is_already_stored;
+        for (let slot of TILESET_SLOTS) {
+            if (! def.tileset.layout['#supported-versions'].has(slot.ident)) continue;
+            // Tick the matching table radio so the table + a later Save agree…
+            let radio = this.tileset_table.querySelector(
+                `input[name="tileset-${slot.ident}"][value="${CSS.escape(ident)}"]`);
+            if (radio) radio.checked = true;
+            // …and swap it in live so the change is visible immediately.
+            this.conductor.tilesets[slot.ident] = def.tileset;
+            this.conductor._loaded_tilesets[ident] = def.tileset;
+            if (persist) this.conductor.options.tilesets[slot.ident] = ident;
+        }
+        if (persist) this.conductor.save_stash();
+        this._apply_tilesets_live();
+    }
+    _apply_tilesets_live() {
+        let p = this.conductor.player;
+        if (p) {
+            p._loaded_tileset = false;
+            if (p.level) { p.update_tileset(); if (p._redraw) p._redraw(); }
+        }
+        let ed = this.conductor.editor;
+        if (ed) ed._loaded_tileset = false;
     }
 
     // ---- Reskin: export the current tileset + a labelled guide -------------
@@ -4030,36 +4086,29 @@ const EDITOR_PALETTE = [
 ];
 
 class TileEditorOverlay extends DialogOverlay {
-    constructor(conductor, tileset) {
+    constructor(conductor, sources, initial_ident) {
         super(conductor);
         this.root.classList.add('dialog-tile-editor');
         this.set_title("Tile editor");
 
-        this.layout = tileset.layout;
-        this.TS = tileset.size_x;
-        let img = tileset.image;
-        this.cols = Math.round((img.naturalWidth || img.width) / this.TS);
-        this.rows = Math.round((img.naturalHeight || img.height) / this.TS);
+        // Tilesets available to paint on (ident -> {name, tileset, …}); switchable in the UI.
+        this.sources = sources;
+        this.source_ident = (sources && sources[initial_ident]) ? initial_ident
+            : (sources && sources['lexy'] ? 'lexy' : Object.keys(sources || {})[0]);
 
-        // Working sheet: a mutable copy of the tileset. A live Tileset shares this
-        // canvas, so painting on it + a redraw shows in-game after Apply.
-        this.sheet = mk('canvas', {width: this.cols * this.TS, height: this.rows * this.TS});
-        this.sctx = this.sheet.getContext('2d');
-        this.sctx.drawImage(img, 0, 0);
-        this.work_tileset = new Tileset(this.sheet, this.layout, this.TS, this.TS);
-
-        this.cells = compute_cell_labels(tileset);
         this.cell_index = 0;
         this.zoom = 13;
         this.color = '#caa25a';
         this.tool = 'pencil';
-        this._undo = [];
         this._clip = null;      // copied cell ImageData
         this.onion = false;
         this.reference = null;  // a comparison Tileset (read-only)
         this.comparing = false; // showing the reference in the main canvas
         this.ghost_alpha = 0.5; // opacity of the reference ghost overlay
         this._drag = null;      // {x0,y0,x1,y1} while dragging a line/rect
+        this._dirty = false;    // unapplied edits to the current source?
+
+        this._build_sheet_from(this.sources[this.source_ident].tileset);
 
         this._build_ui();
         this._load_cell(0);
@@ -4075,6 +4124,47 @@ class TileEditorOverlay extends DialogOverlay {
         this._keyup = ev => { if (ev.key === '\\') this._set_compare(false); };
         this.root.addEventListener('keydown', this._keydown);
         this.root.addEventListener('keyup', this._keyup);
+    }
+
+    // (Re)build the mutable working sheet from a source tileset. A live Tileset shares
+    // this canvas, so painting on it + a redraw shows in-game after Apply.
+    _build_sheet_from(tileset) {
+        this.source_tileset = tileset;
+        this.layout = tileset.layout;
+        this.TS = tileset.size_x;
+        let img = tileset.image;
+        this.cols = Math.round((img.naturalWidth || img.width) / this.TS);
+        this.rows = Math.round((img.naturalHeight || img.height) / this.TS);
+        this.sheet = mk('canvas', {width: this.cols * this.TS, height: this.rows * this.TS});
+        this.sctx = this.sheet.getContext('2d');
+        this.sctx.drawImage(img, 0, 0);
+        this.work_tileset = new Tileset(this.sheet, this.layout, this.TS, this.TS);
+        this.cells = compute_cell_labels(tileset);
+        this._undo = [];
+    }
+
+    _switch_source(ident) {
+        if (! this.sources[ident] || ident === this.source_ident) return;
+        if (this._dirty && ! window.confirm(
+                "Switch which tileset you're editing? Changes you haven't applied will be lost.")) {
+            this.source_select.value = this.source_ident;  // revert the dropdown
+            return;
+        }
+        this.source_ident = ident;
+        this._build_sheet_from(this.sources[ident].tileset);
+        this._dirty = false;
+        // Resize the edit canvas if this source has a different tile size.
+        let CV = this.TS * this.zoom;
+        if (this.edit_canvas.width !== CV) { this.edit_canvas.width = CV; this.edit_canvas.height = CV; }
+        // Refresh the reference tileset to match the new layout/size, then redraw all views.
+        if (this.reference && (this.reference.layout !== this.layout || this.reference.size_x !== this.TS)) {
+            this.reference = new Tileset(this.reference.image, this.layout, this.TS, this.TS);
+        }
+        if (this.cell_index >= this.cells.length) this.cell_index = 0;
+        this._load_cell(this.cell_index);
+        this.minimap.width = this.cols * this.map_scale;
+        this.minimap.height = this.rows * this.map_scale;
+        this._refresh_minimap();
     }
 
     _build_ui() {
@@ -4116,6 +4206,14 @@ class TileEditorOverlay extends DialogOverlay {
         this.ectx = this.edit_canvas.getContext('2d');
         this.ectx.imageSmoothingEnabled = false;
         this._bind_canvas();
+
+        // -- which tileset are we painting on? --
+        this.source_select = mk('select.-source-select');
+        for (let [ident, def] of Object.entries(this.sources)) {
+            this.source_select.append(mk('option', {value: ident}, def.name || ident));
+        }
+        this.source_select.value = this.source_ident;
+        this.source_select.addEventListener('change', () => this._switch_source(this.source_select.value));
 
         // -- nav + filmstrip --
         this.cell_label_el = mk('div.-cell-label');
@@ -4165,6 +4263,7 @@ class TileEditorOverlay extends DialogOverlay {
                     mk('label.-onion', this.onion_cb, " onion skin"),
                 ),
                 mk('div.-center',
+                    mk('label.-source', "Editing: ", this.source_select),
                     mk('div.-nav', prev, this.cell_label_el, next),
                     this.edit_canvas,
                     this.strip_el,
@@ -4492,6 +4591,7 @@ class TileEditorOverlay extends DialogOverlay {
         let TS = this.TS, [ox, oy] = this._sheet_xy(0, 0);
         this._undo.push(this.sctx.getImageData(ox, oy, TS, TS));
         if (this._undo.length > 50) this._undo.shift();
+        this._dirty = true;
     }
     _undo_pop() {
         if (! this._undo.length) return;
@@ -4521,6 +4621,22 @@ class TileEditorOverlay extends DialogOverlay {
         });
         for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = EDITOR_TILESET_BUCKET;
         this.conductor.save_stash();
+
+        // The applied edits ARE the "Edited in-app" set now — make it a selectable source
+        // (and the current one) so continued editing builds on this instead of the original.
+        if (! this.sources[EDITOR_TILESET_BUCKET]) {
+            this.sources[EDITOR_TILESET_BUCKET] = {
+                ident: EDITOR_TILESET_BUCKET, name: "Edited in-app ✎",
+                is_already_stored: true, tileset: this.work_tileset,
+            };
+            this.source_select.append(mk('option', {value: EDITOR_TILESET_BUCKET}, "Edited in-app ✎"));
+        }
+        else {
+            this.sources[EDITOR_TILESET_BUCKET].tileset = this.work_tileset;
+        }
+        this.source_ident = EDITOR_TILESET_BUCKET;
+        this.source_select.value = EDITOR_TILESET_BUCKET;
+        this._dirty = false;
     }
 
     close() {
