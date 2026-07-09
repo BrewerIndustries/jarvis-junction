@@ -3506,10 +3506,16 @@ class OptionsOverlay extends DialogOverlay {
         dl_guide_button.addEventListener('click', () => this._download_guide());
         let legend_button = mk('button', {type: 'button'}, "View legend");
         legend_button.addEventListener('click', () => this._view_legend());
+        let edit_button = mk('button.button-bright', {type: 'button'}, "✎ Edit tiles in-app");
+        edit_button.addEventListener('click', () => {
+            let ts = this._reskin_source();
+            if (ts) new TileEditorOverlay(this.conductor, ts).open();
+        });
         this.main.append(
             mk('p.-reskin-intro',
-                "Reskin the game: ", mk('b', "download"), " the tileset, paint over its 32×32 cells in any image editor, then ",
-                mk('b', "load"), " it back."),
+                "Reskin the game — ", mk('b', "paint tiles right here"), " with ", mk('b', "Edit tiles"), ", or ",
+                mk('b', "download"), " the sheet, edit it elsewhere, and ", mk('b', "load"), " it back."),
+            mk('p', edit_button),
             mk('p', dl_tileset_button, " ", dl_guide_button, " ", legend_button,
                 " — the sheet, an overlay numbering every cell, and a legend saying what each number is."),
             mk('p',
@@ -3954,6 +3960,285 @@ class OptionsOverlay extends DialogOverlay {
         this.conductor.player.update_music_playback_state();
 
         super.close();
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// In-app pixel editor — paint any cell of the tileset and apply it live.
+
+// Walk a tileset layout into a numbered, labelled list of every cell. The label
+// is the path to the cell (state / direction / frame), e.g. "moving · west · #3".
+function compute_cell_labels(tileset) {
+    let img = tileset.image;
+    let cols = Math.round((img.naturalWidth || img.width) / tileset.size_x);
+    let rows = Math.round((img.naturalHeight || img.height) / tileset.size_y);
+    const SKIP = new Set(['__special__', 'modes', 'is_wired_optional', 'duration',
+        'cc2_duration', 'positionally_hashed', 'scroll_region', '_distinct', 'global']);
+    const WRAP = new Set(['all', 'normal']);
+    let claimed = {};
+    let walk = (tile, node, path) => {
+        if (Array.isArray(node)) {
+            if (node.length === 2 && Number.isInteger(node[0]) && Number.isInteger(node[1])
+                && node[0] < cols && node[1] < rows)
+            {
+                let key = node[0] + ',' + node[1];
+                if (! (key in claimed)) claimed[key] = { tile, label: path.join(' · ') };
+                return;
+            }
+            node.forEach((e, i) => walk(tile, e, path.concat('#' + (i + 1))));
+            return;
+        }
+        if (node && typeof node === 'object') {
+            for (let [k, v] of Object.entries(node)) {
+                if (k[0] === '#' || SKIP.has(k)) continue;
+                walk(tile, v, WRAP.has(k) ? path : path.concat(k));
+            }
+        }
+    };
+    for (let [name, v] of Object.entries(tileset.layout)) {
+        if (name[0] !== '#') walk(name, v, []);
+    }
+    let cells = Object.entries(claimed).map(([k, info]) => {
+        let [c, r] = k.split(',').map(Number);
+        return { c, r, tile: info.tile, label: info.label };
+    });
+    cells.sort((a, b) => a.r - b.r || a.c - b.c);
+    cells.forEach((cell, i) => cell.n = i + 1);
+    return cells;
+}
+
+const EDITOR_PALETTE = [
+    '#000000', '#3a2c20', '#6b5340', '#a9805a', '#caa25a', '#e8c46a', '#f4e2a6', '#ffffff',
+    '#8a2e2e', '#c0392b', '#e07a3c', '#d9a441', '#7a8a4a', '#4a8a5a', '#3a6d8c', '#5f9cc4',
+    '#b06a44', '#a86848', '#8fd0e8', '#a6e3c0', '#d4a2c4', '#9a6db0', '#c8b89a', '#8c7c68',
+];
+
+class TileEditorOverlay extends DialogOverlay {
+    constructor(conductor, tileset) {
+        super(conductor);
+        this.root.classList.add('dialog-tile-editor');
+        this.set_title("Tile editor");
+
+        this.layout = tileset.layout;
+        this.TS = tileset.size_x;
+        let img = tileset.image;
+        this.cols = Math.round((img.naturalWidth || img.width) / this.TS);
+        this.rows = Math.round((img.naturalHeight || img.height) / this.TS);
+
+        // Working sheet: a mutable copy of the tileset. A live Tileset shares this
+        // canvas, so painting on it + a redraw shows in-game after Apply.
+        this.sheet = mk('canvas', {width: this.cols * this.TS, height: this.rows * this.TS});
+        this.sctx = this.sheet.getContext('2d');
+        this.sctx.drawImage(img, 0, 0);
+        this.work_tileset = new Tileset(this.sheet, this.layout, this.TS, this.TS);
+
+        this.cells = compute_cell_labels(tileset);
+        this.cell_index = 0;
+        this.zoom = 14;
+        this.color = '#caa25a';
+        this.tool = 'pencil';
+        this._undo = [];
+
+        this._build_ui();
+        this._load_cell(0);
+
+        this.add_button("apply", () => this._apply());
+        this.add_button("done", () => { this._apply(); this.close(); });
+        this.add_button("cancel", () => this.close());
+    }
+
+    _build_ui() {
+        let CV = this.TS * this.zoom;
+        this.tool_buttons = {};
+        let tool_row = mk('div.-tools');
+        for (let [id, label] of [['pencil', '✏ pencil'], ['eraser', '▨ eraser'], ['fill', '🪣 fill'], ['eyedropper', '⦿ pick']]) {
+            let b = mk('button', {type: 'button'}, label);
+            b.addEventListener('click', () => this._set_tool(id));
+            this.tool_buttons[id] = b;
+            tool_row.append(b);
+        }
+
+        let pal = mk('div.-palette');
+        for (let c of EDITOR_PALETTE) {
+            let sw = mk('button.-swatch', {type: 'button', title: c});
+            sw.style.background = c;
+            sw.addEventListener('click', () => this._set_color(c));
+            pal.append(sw);
+        }
+        this.color_input = mk('input', {type: 'color', value: this.color});
+        this.color_input.addEventListener('input', ev => this._set_color(ev.target.value, false));
+
+        this.edit_canvas = mk('canvas.-edit', {width: CV, height: CV});
+        this.ectx = this.edit_canvas.getContext('2d');
+        this.ectx.imageSmoothingEnabled = false;
+        this._bind_canvas();
+
+        this.cell_label_el = mk('div.-cell-label');
+        let prev = mk('button', {type: 'button'}, "‹ prev");
+        prev.addEventListener('click', () => this._load_cell(this.cell_index - 1));
+        let next = mk('button', {type: 'button'}, "next ›");
+        next.addEventListener('click', () => this._load_cell(this.cell_index + 1));
+        let undo = mk('button', {type: 'button'}, "↶ undo");
+        undo.addEventListener('click', () => this._undo_pop());
+        this.search = mk('input.-cell-search', {type: 'search', placeholder: "find a cell… e.g. player west, key red"});
+        this.search.addEventListener('change', () => this._search());
+
+        this.main.append(
+            mk('p.-editor-intro', "Paint a cell, then ", mk('b', "apply"), " to see it in the game. Cell numbers match the legend."),
+            mk('div.-editor',
+                mk('div.-left', tool_row, pal, mk('label.-custom-color', "custom ", this.color_input)),
+                mk('div.-center',
+                    mk('div.-nav', prev, this.cell_label_el, next, undo),
+                    this.edit_canvas,
+                    this.search),
+            ),
+        );
+        this._set_tool('pencil');
+        this._set_color(this.color);
+    }
+
+    _set_tool(id) {
+        this.tool = id;
+        for (let [k, b] of Object.entries(this.tool_buttons)) b.classList.toggle('--pressed', k === id);
+    }
+    _set_color(c, update_input = true) {
+        this.color = c;
+        if (update_input && this.color_input) this.color_input.value = c;
+    }
+
+    _load_cell(idx) {
+        if (this.cells.length === 0) return;
+        this.cell_index = (idx + this.cells.length) % this.cells.length;
+        this.cell = this.cells[this.cell_index];
+        this._undo = [];
+        this.cell_label_el.textContent =
+            `#${this.cell.n} · ${this.cell.tile}${this.cell.label ? ' · ' + this.cell.label : ''} (${this.cell.c},${this.cell.r})`;
+        this._redraw_edit();
+    }
+
+    _search() {
+        let q = this.search.value.trim().toLowerCase();
+        if (! q) return;
+        let terms = q.split(/\s+/);
+        let hit = this.cells.findIndex(c =>
+            terms.every(t => (c.tile + ' ' + c.label + ' #' + c.n).toLowerCase().includes(t)));
+        if (hit >= 0) this._load_cell(hit);
+    }
+
+    _redraw_edit() {
+        let CV = this.edit_canvas.width, TS = this.TS, s = this.zoom, ctx = this.ectx;
+        ctx.clearRect(0, 0, CV, CV);
+        for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            ctx.fillStyle = ((x + y) & 1) ? '#d7ccb8' : '#c4b79e';
+            ctx.fillRect(x * s, y * s, s, s);
+        }
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(this.sheet, this.cell.c * TS, this.cell.r * TS, TS, TS, 0, 0, CV, CV);
+        ctx.strokeStyle = 'rgba(0,0,0,0.14)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= TS; i++) {
+            ctx.beginPath(); ctx.moveTo(i*s + 0.5, 0); ctx.lineTo(i*s + 0.5, CV); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i*s + 0.5); ctx.lineTo(CV, i*s + 0.5); ctx.stroke();
+        }
+    }
+
+    _bind_canvas() {
+        let painting = false;
+        let to_px = ev => {
+            let r = this.edit_canvas.getBoundingClientRect();
+            let x = Math.floor((ev.clientX - r.x) / r.width * this.TS);
+            let y = Math.floor((ev.clientY - r.y) / r.height * this.TS);
+            return [Math.max(0, Math.min(this.TS - 1, x)), Math.max(0, Math.min(this.TS - 1, y))];
+        };
+        this.edit_canvas.addEventListener('pointerdown', ev => {
+            ev.preventDefault();
+            let [px, py] = to_px(ev);
+            if (this.tool === 'eyedropper') { this._pick(px, py); return; }
+            this._push_undo();
+            if (this.tool === 'fill') { this._flood(px, py); }
+            else { painting = true; this._paint(px, py); }
+        });
+        this.edit_canvas.addEventListener('pointermove', ev => {
+            if (painting) { let [px, py] = to_px(ev); this._paint(px, py); }
+        });
+        window.addEventListener('pointerup', () => { painting = false; });
+    }
+
+    _sheet_xy(px, py) { return [this.cell.c * this.TS + px, this.cell.r * this.TS + py]; }
+
+    _paint(px, py) {
+        let [gx, gy] = this._sheet_xy(px, py);
+        this.sctx.clearRect(gx, gy, 1, 1);
+        if (this.tool !== 'eraser') {
+            this.sctx.fillStyle = this.color;
+            this.sctx.fillRect(gx, gy, 1, 1);
+        }
+        this._redraw_edit();
+    }
+
+    _pick(px, py) {
+        let [gx, gy] = this._sheet_xy(px, py);
+        let d = this.sctx.getImageData(gx, gy, 1, 1).data;
+        if (d[3] === 0) return;
+        this._set_color('#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join(''));
+        this._set_tool('pencil');
+    }
+
+    _flood(px, py) {
+        let TS = this.TS, [ox, oy] = this._sheet_xy(0, 0);
+        let region = this.sctx.getImageData(ox, oy, TS, TS), d = region.data;
+        let at = (x, y) => (y * TS + x) * 4;
+        let i0 = at(px, py);
+        let target = [d[i0], d[i0+1], d[i0+2], d[i0+3]];
+        let hex = this.color.replace('#', '');
+        let fill = this.tool === 'eraser' ? [0, 0, 0, 0]
+            : [parseInt(hex.slice(0,2), 16), parseInt(hex.slice(2,4), 16), parseInt(hex.slice(4,6), 16), 255];
+        let same = (i, c) => d[i]===c[0] && d[i+1]===c[1] && d[i+2]===c[2] && d[i+3]===c[3];
+        if (same(i0, fill)) return;
+        let stack = [[px, py]];
+        while (stack.length) {
+            let [x, y] = stack.pop();
+            if (x < 0 || y < 0 || x >= TS || y >= TS) continue;
+            let i = at(x, y);
+            if (! same(i, target)) continue;
+            d[i] = fill[0]; d[i+1] = fill[1]; d[i+2] = fill[2]; d[i+3] = fill[3];
+            stack.push([x+1, y], [x-1, y], [x, y+1], [x, y-1]);
+        }
+        this.sctx.putImageData(region, ox, oy);
+        this._redraw_edit();
+    }
+
+    _push_undo() {
+        let TS = this.TS, [ox, oy] = this._sheet_xy(0, 0);
+        this._undo.push(this.sctx.getImageData(ox, oy, TS, TS));
+        if (this._undo.length > 50) this._undo.shift();
+    }
+    _undo_pop() {
+        if (! this._undo.length) return;
+        let [ox, oy] = this._sheet_xy(0, 0);
+        this.sctx.putImageData(this._undo.pop(), ox, oy);
+        this._redraw_edit();
+    }
+
+    _apply() {
+        // Make the working tileset active everywhere, live.
+        for (let slot of TILESET_SLOTS) {
+            this.conductor.tilesets[slot.ident] = this.work_tileset;
+        }
+        this.conductor._loaded_tilesets['Editor'] = this.work_tileset;
+        let p = this.conductor.player;
+        if (p && p.renderer) { p.renderer.tileset = this.work_tileset; if (p._redraw) p._redraw(); }
+        if (this.conductor.editor && this.conductor.editor.renderer) {
+            this.conductor.editor.renderer.tileset = this.work_tileset;
+        }
+        // Persist as a custom tileset so it survives reload (reuses the load path).
+        save_json_to_storage(CUSTOM_TILESET_PREFIX + 'Editor', {
+            ident: 'Editor', name: 'Edited tileset',
+            layout: this.layout['#ident'], tile_width: this.TS, tile_height: this.TS,
+            src: this.sheet.toDataURL('image/png'),
+        });
+        for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = 'Editor';
+        this.conductor.save_stash();
     }
 }
 class CompatOverlay extends DialogOverlay {

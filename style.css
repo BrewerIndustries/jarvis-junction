@@ -3078,3 +3078,29 @@ body {
     .fx-shake-sm, .fx-shake-md, .fx-shake-lg,
     .player-overlay-message[data-reason='success'] > h2 { animation: none; }
 }
+
+/* ============================================================
+   In-app tile editor
+   ============================================================ */
+.dialog-tile-editor .-editor { display: flex; gap: 18px; align-items: flex-start; }
+.dialog-tile-editor .-left { display: flex; flex-direction: column; gap: 12px; width: 168px; flex: 0 0 auto; }
+.dialog-tile-editor .-tools { display: flex; flex-wrap: wrap; gap: 5px; }
+.dialog-tile-editor .-tools button { flex: 1 1 46%; }
+.dialog-tile-editor button.--pressed { background: hsl(var(--main-hue), 80%, 45%); }
+.dialog-tile-editor .-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.dialog-tile-editor .-swatch { width: 100%; aspect-ratio: 1; padding: 0; border: 1px solid #0004; border-radius: 3px; cursor: pointer; }
+.dialog-tile-editor .-swatch:hover { outline: 2px solid hsl(var(--main-hue), 70%, 50%); outline-offset: 1px; }
+.dialog-tile-editor .-custom-color { display: flex; align-items: center; gap: 6px; font-size: 0.85em; }
+.dialog-tile-editor .-center { display: flex; flex-direction: column; gap: 8px; }
+.dialog-tile-editor .-nav { display: flex; gap: 8px; align-items: center; }
+.dialog-tile-editor .-cell-label { flex: 1; font-family: monospace; font-size: 12px; color: hsl(var(--main-hue), 30%, 30%); text-align: center; }
+.dialog-tile-editor .-edit {
+    image-rendering: pixelated;
+    border: 2px solid hsl(var(--main-hue), 40%, 35%);
+    border-radius: 2px;
+    cursor: crosshair;
+    touch-action: none;
+    background: #c4b79e;
+}
+.dialog-tile-editor .-cell-search { width: 100%; box-sizing: border-box; font-family: monospace; }
+.dialog-tile-editor .-editor-intro { color: #6b5c49; margin: 0 0 12px; }
