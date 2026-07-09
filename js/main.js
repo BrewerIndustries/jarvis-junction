@@ -3500,11 +3500,20 @@ class OptionsOverlay extends DialogOverlay {
         // FIXME allow drag-drop into...  this window?  area?  idk
         let custom_tileset_button = mk('button', {type: 'button'}, "Load custom tileset");
         custom_tileset_button.addEventListener('click', () => this.root.elements['custom-tileset'].click());
+        let dl_tileset_button = mk('button', {type: 'button'}, "⤓ Download tileset");
+        dl_tileset_button.addEventListener('click', () => this._download_tileset());
+        let dl_guide_button = mk('button', {type: 'button'}, "⤓ Download label guide");
+        dl_guide_button.addEventListener('click', () => this._download_guide());
         this.main.append(
+            mk('p.-reskin-intro',
+                "Reskin the game: ", mk('b', "download"), " the tileset, paint over its 32×32 cells in any image editor, then ",
+                mk('b', "load"), " it back."),
+            mk('p', dl_tileset_button, " ", dl_guide_button,
+                " — a 1024×1024 sheet, plus a labelled overlay you can lay on top while you paint."),
             mk('p',
                 mk('input', {type: 'file', name: 'custom-tileset'}),
                 custom_tileset_button,
-                " — Any format: MSCC, Tile World, or Steam.",
+                " — an edited sheet (or any MSCC / Tile World / Steam tileset). Pick it in the table above, then Save.",
             ),
             mk('p', "(Steam CC tilesets are in the game files under ", mk('code', "data/bmp"), ".)"),
             mk('div.option-load-tileset'),
@@ -3643,6 +3652,90 @@ class OptionsOverlay extends DialogOverlay {
                 convert_tileset_to_layout(def.tileset, 'tw-animated');
             }),
         ));
+    }
+
+    // ---- Reskin: export the current tileset + a labelled guide -------------
+    _reskin_source() {
+        // The base "Jarvis" tileset if present, else whatever's first.
+        let def = this.available_tilesets['lexy'] ?? Object.values(this.available_tilesets)[0];
+        return def && def.tileset;
+    }
+
+    _download_blob(blob, filename) {
+        let url = URL.createObjectURL(blob);
+        let a = mk('a', {href: url, download: filename});
+        document.body.append(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    _download_tileset() {
+        let ts = this._reskin_source();
+        if (! ts) return;
+        let img = ts.image;
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        let canvas = mk('canvas', {width: w, height: h});
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.toBlob(blob => this._download_blob(blob, "jarvis-junction-tileset.png"));
+    }
+
+    // Walk a tileset layout into { name: [[col,row], ...] } of integer grid cells.
+    _layout_cells(layout, cols, rows) {
+        let out = {};
+        const SKIP = new Set(['__special__', 'modes', 'is_wired_optional', 'duration',
+            'cc2_duration', 'positionally_hashed', 'scroll_region', '_distinct']);
+        let walk = (name, v) => {
+            if (Array.isArray(v)) {
+                if (v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number') {
+                    if (Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] < cols && v[1] < rows) {
+                        (out[name] = out[name] || []).push([v[0], v[1]]);
+                    }
+                    return;
+                }
+                for (let e of v) walk(name, e);
+                return;
+            }
+            if (v && typeof v === 'object') {
+                for (let [k, val] of Object.entries(v)) {
+                    if (k[0] === '#' || SKIP.has(k)) continue;
+                    walk(name, val);
+                }
+            }
+        };
+        for (let [name, v] of Object.entries(layout)) {
+            if (name[0] !== '#') walk(name, v);
+        }
+        return out;
+    }
+
+    _download_guide() {
+        let ts = this._reskin_source();
+        if (! ts) return;
+        let img = ts.image;
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        let sx = ts.size_x, sy = ts.size_y;
+        let cols = Math.round(w / sx), rows = Math.round(h / sy);
+        let canvas = mk('canvas', {width: w, height: h});
+        let ctx = canvas.getContext('2d');
+        // Transparent overlay: grid + each tile named at its slot. Lay this on top
+        // of the downloaded tileset as a reference layer, then hide it before saving.
+        ctx.strokeStyle = 'rgba(30,24,20,0.35)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= cols; i++) { ctx.beginPath(); ctx.moveTo(i*sx + 0.5, 0); ctx.lineTo(i*sx + 0.5, h); ctx.stroke(); }
+        for (let j = 0; j <= rows; j++) { ctx.beginPath(); ctx.moveTo(0, j*sy + 0.5); ctx.lineTo(w, j*sy + 0.5); ctx.stroke(); }
+        ctx.font = '7px monospace';
+        ctx.textBaseline = 'top';
+        let cells = this._layout_cells(ts.layout, cols, rows);
+        for (let [name, list] of Object.entries(cells)) {
+            for (let [c, r] of list) {
+                ctx.fillStyle = 'rgba(20,16,12,0.72)';
+                ctx.fillRect(c*sx, r*sy, sx, 8);
+                ctx.fillStyle = '#ffe0b0';
+                ctx.fillText(name.slice(0, 8), c*sx + 1, r*sy + 1);
+            }
+        }
+        canvas.toBlob(blob => this._download_blob(blob, "jarvis-junction-guide.png"));
     }
 
     async _load_custom_tileset(file) {
