@@ -3366,6 +3366,9 @@ const TILESET_SLOTS = [{
     name: "LL",
 }];
 const CUSTOM_TILESET_BUCKETS = ['Custom 1', 'Custom 2', 'Custom 3'];
+// The in-app tile editor stores its edits under this dedicated bucket (kept out of
+// CUSTOM_TILESET_BUCKETS so uploads never clobber it, and never garbage-collected on Save).
+const EDITOR_TILESET_BUCKET = 'Editor';
 const CUSTOM_TILESET_PREFIX = "Lexy's Labyrinth custom tileset: ";
 class OptionsOverlay extends DialogOverlay {
     constructor(conductor) {
@@ -3485,6 +3488,18 @@ class OptionsOverlay extends DialogOverlay {
                     tileset: conductor._loaded_tilesets[bucket],
                 };
             }
+        }
+        // Surface any other stored tilesets (e.g. the in-app editor's "Editor" bucket)
+        // as first-class rows, so choosing them and hitting Save doesn't silently drop
+        // them back to Lexy.
+        for (let [ident, tileset] of Object.entries(conductor._loaded_tilesets)) {
+            if (this.available_tilesets[ident] || BUILTIN_TILESETS[ident]) continue;
+            this.available_tilesets[ident] = {
+                ident,
+                name: ident === EDITOR_TILESET_BUCKET ? "Edited in-app ✎" : ident,
+                is_already_stored: true,
+                tileset,
+            };
         }
 
         let thead = mk('tr', mk('th', "Preview"), mk('th', "Format"));
@@ -3616,6 +3631,7 @@ class OptionsOverlay extends DialogOverlay {
         ));
 
         tr.append(mk('td.-format',
+            ...(def.name ? [mk('div.-tileset-name', def.name)] : []),
             def.tileset.layout['#name'],
             mk('br'),
             `${def.tileset.size_x}×${def.tileset.size_y}px`,
@@ -4042,6 +4058,7 @@ class TileEditorOverlay extends DialogOverlay {
         this.onion = false;
         this.reference = null;  // a comparison Tileset (read-only)
         this.comparing = false; // showing the reference in the main canvas
+        this.ghost_alpha = 0.5; // opacity of the reference ghost overlay
         this._drag = null;      // {x0,y0,x1,y1} while dragging a line/rect
 
         this._build_ui();
@@ -4121,6 +4138,12 @@ class TileEditorOverlay extends DialogOverlay {
         this.ref_thumb = mk('canvas.-ref-thumb', {width: this.TS * 4, height: this.TS * 4});
         this.compare_b = mk('button', {type: 'button', disabled: true}, "◑ compare");
         this.compare_b.addEventListener('click', () => this._set_compare(! this.comparing));
+        this.ghost_slider = mk('input.-ghost-slider', {
+            type: 'range', min: 10, max: 90, value: Math.round(this.ghost_alpha * 100), disabled: true});
+        this.ghost_slider.addEventListener('input', () => {
+            this.ghost_alpha = this.ghost_slider.value / 100;
+            if (this.comparing) this._redraw_edit();
+        });
 
         // -- whole-tileset board (click a cell to edit) --
         this.map_scale = 12;
@@ -4152,6 +4175,7 @@ class TileEditorOverlay extends DialogOverlay {
                     this.ref_select, this.ref_file,
                     this.ref_thumb,
                     this.compare_b,
+                    mk('label.-ghost-opacity', "ghost", this.ghost_slider),
                     mk('p.-hint', "hold \\ to peek"),
                 ),
             ),
@@ -4233,7 +4257,7 @@ class TileEditorOverlay extends DialogOverlay {
         }
         // reference ghost overlaid on top, for tracing
         if (this.comparing && this.reference) {
-            ctx.globalAlpha = 0.5;
+            ctx.globalAlpha = this.ghost_alpha;
             this._blit_cell(ctx, this.reference.image, cell.c, cell.r, CV, CV);
             ctx.globalAlpha = 1;
         }
@@ -4460,6 +4484,7 @@ class TileEditorOverlay extends DialogOverlay {
         this.comparing = on && !! this.reference;
         this.compare_b.classList.toggle('--pressed', this.comparing);
         this.edit_canvas.classList.toggle('-comparing', this.comparing);
+        this.ghost_slider.disabled = ! this.comparing;
         this._redraw_edit();
     }
 
@@ -4482,19 +4507,19 @@ class TileEditorOverlay extends DialogOverlay {
         for (let slot of TILESET_SLOTS) {
             this.conductor.tilesets[slot.ident] = this.work_tileset;
         }
-        this.conductor._loaded_tilesets['Editor'] = this.work_tileset;
+        this.conductor._loaded_tilesets[EDITOR_TILESET_BUCKET] = this.work_tileset;
         let p = this.conductor.player;
         if (p && p.renderer) { p.renderer.tileset = this.work_tileset; if (p._redraw) p._redraw(); }
         if (this.conductor.editor && this.conductor.editor.renderer) {
             this.conductor.editor.renderer.tileset = this.work_tileset;
         }
         // Persist as a custom tileset so it survives reload (reuses the load path).
-        save_json_to_storage(CUSTOM_TILESET_PREFIX + 'Editor', {
-            ident: 'Editor', name: 'Edited tileset',
+        save_json_to_storage(CUSTOM_TILESET_PREFIX + EDITOR_TILESET_BUCKET, {
+            ident: EDITOR_TILESET_BUCKET, name: 'Edited tileset',
             layout: this.layout['#ident'], tile_width: this.TS, tile_height: this.TS,
             src: this.sheet.toDataURL('image/png'),
         });
-        for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = 'Editor';
+        for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = EDITOR_TILESET_BUCKET;
         this.conductor.save_stash();
     }
 

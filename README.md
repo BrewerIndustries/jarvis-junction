@@ -26,6 +26,13 @@ It's static JS with **no build system**: serve the directory and open it in a br
   screen-shake, "duty complete" confetti, mobile haptics — all off the sfx event
   hook, honoring `prefers-reduced-motion`; plus a game-speed slider, effects
   toggle, last-pressed-wins key override, and input buffering.
+- ✅ **In-app tile editor** (Options → Tilesets → *Edit tiles in-app*): a Piskel-style
+  pixel editor — pencil/eraser/fill/line/rect, palette + custom color, undo, copy/paste,
+  onion skin, a searchable per-cell navigator, and a whole-tileset board (click any cell
+  to edit). **Compare** ghost-overlays a reference set (the original Lexy art, or any PNG
+  you load) on the canvas for tracing, with a ghost-opacity slider and hold-`\` peek.
+  Edits save live to an *"Edited in-app"* tileset that persists across reloads and is a
+  first-class row in the Tilesets table (so hitting Save no longer drops it back to Lexy).
 - ⏳ Next (per DESIGN.md): accessibility (colorblind palette, remappable keys),
   progression (medals/Daily Duty), the manor-hub campaign. Original tileset art +
   servers are later.

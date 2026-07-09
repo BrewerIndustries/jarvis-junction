@@ -3134,3 +3134,7 @@ body {
 .dialog-tile-editor .-frame:hover { border-color: hsl(var(--main-hue), 50%, 55%); }
 .dialog-tile-editor .-frame.--current { border-color: hsl(var(--main-hue), 80%, 45%); }
 .dialog-tile-editor .-edit.-comparing { border-color: #8a6db5; box-shadow: 0 0 0 2px #8a6db555; }
+.dialog-tile-editor .-ghost-opacity { display: flex; align-items: center; gap: 6px; font-size: 0.8em; color: var(--muted, #8c7d69); }
+.dialog-tile-editor .-ghost-slider { flex: 1; min-width: 0; accent-color: #8a6db5; }
+.dialog-tile-editor .-ghost-slider:disabled { opacity: 0.4; }
+.option-tilesets .-tileset-name { font-weight: 600; color: hsl(var(--main-hue), 35%, 38%); }
