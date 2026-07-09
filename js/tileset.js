@@ -1029,7 +1029,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
 
 export const LL_TILESET_LAYOUT = {
     '#ident': 'lexy',
-    '#name': "Lexy's Labyrinth",
+    '#name': "Jarvis's Junction",
     '#dimensions': [32, 32],
     '#supported-versions': new Set(['cc1', 'cc2', 'll']),
     '#wire-width': 1/16,

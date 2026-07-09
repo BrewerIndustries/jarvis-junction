@@ -3266,7 +3266,7 @@ class Splash extends PrimaryView {
 
 const BUILTIN_TILESETS = {
     lexy: {
-        name: "Lexy's Labyrinth",
+        name: "Jarvis's Junction",
         src: 'tileset-lexy.png',
         layout: 'lexy',
         tile_width: 32,
@@ -3796,9 +3796,9 @@ class CompatOverlay extends DialogOverlay {
         this.main.append(
             mk('p',
                 "These are more technical settings, and as such are documented in full on ",
-                mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/wiki/Compatibility'}, "the project wiki"),
+                mk('a', {href: 'https://github.com/BrewerIndustries/jarvis-junction'}, "the project page"),
                 "."),
-            mk('p', "Lexy mode should be fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for."),
+            mk('p', "Jarvis mode should be fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for."),
             mk('p', "Changes take effect when a level starts."),
         );
 

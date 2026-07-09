@@ -145,7 +145,7 @@ export const ACTOR_TRAITS = {
 };
 
 export const COMPAT_RULESET_LABELS = {
-    lexy: "Lexy",
+    lexy: "Jarvis",
     steam: "Steam",
     'steam-strict': "Steam (strict)",
     lynx: "Lynx",
