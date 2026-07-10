@@ -4759,9 +4759,13 @@ class TileEditorOverlay extends DialogOverlay {
     _bind_canvas() {
         let painting = false;
         let to_px = ev => {
-            let r = this.edit_canvas.getBoundingClientRect();
-            let x = Math.floor((ev.clientX - r.x) / r.width * this.TS);
-            let y = Math.floor((ev.clientY - r.y) / r.height * this.TS);
+            // Map to the canvas *content* box: getBoundingClientRect is the border box, so
+            // subtract the border (clientLeft/Top) and divide by the content size
+            // (clientWidth/Height) — otherwise the 2px border skews every click by ~1px.
+            let cv = this.edit_canvas;
+            let r = cv.getBoundingClientRect();
+            let x = Math.floor((ev.clientX - r.left - cv.clientLeft) / cv.clientWidth * this.TS);
+            let y = Math.floor((ev.clientY - r.top - cv.clientTop) / cv.clientHeight * this.TS);
             return [Math.max(0, Math.min(this.TS - 1, x)), Math.max(0, Math.min(this.TS - 1, y))];
         };
         this.edit_canvas.addEventListener('pointerdown', ev => {
