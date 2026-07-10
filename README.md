@@ -30,7 +30,8 @@ It's static JS with **no build system**: serve the directory and open it in a br
   hook, honoring `prefers-reduced-motion`; plus a game-speed slider, effects
   toggle, last-pressed-wins key override, and input buffering.
 - ✅ **In-app tile editor** (Options → Tilesets → *Edit tiles in-app*): a Piskel-style
-  pixel editor — pencil/eraser/fill/line/rect, undo, copy/paste, reflect (flip
+  pixel editor — pencil/eraser/fill/line/rect, a **ghost brush** that traces (stamps)
+  pixels down from the Compare reference into the cell, undo, copy/paste, reflect (flip
   horizontal/vertical), onion skin, a searchable per-cell navigator, and a whole-tileset
   board (click any cell to edit). The **palette** has a recently-used strip (top 3 rows,
   MRU, persisted) over a 48-swatch working palette, a **"from tileset"** setup that fills

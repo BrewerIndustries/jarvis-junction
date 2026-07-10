@@ -4373,8 +4373,14 @@ class TileEditorOverlay extends DialogOverlay {
         // -- tools --
         this.tool_buttons = {};
         let tool_row = mk('div.-tools');
-        for (let [id, label] of [['pencil','✏'],['eraser','▨'],['line','╱'],['rect','▭'],['fill','🪣'],['eyedropper','⦿']]) {
-            let b = mk('button', {type: 'button', title: id}, label);
+        let tool_defs = [
+            ['pencil', '✏', 'pencil'], ['eraser', '▨', 'eraser'],
+            ['line', '╱', 'line'], ['rect', '▭', 'rect'], ['fill', '🪣', 'fill'],
+            ['eyedropper', '⦿', 'eyedropper'],
+            ['ghost', '👻', 'ghost brush — trace pixels down from the reference'],
+        ];
+        for (let [id, label, title] of tool_defs) {
+            let b = mk('button', {type: 'button', title}, label);
             b.addEventListener('click', () => this._set_tool(id));
             this.tool_buttons[id] = b;
             tool_row.append(b);
@@ -4505,6 +4511,11 @@ class TileEditorOverlay extends DialogOverlay {
     }
 
     _set_tool(id) {
+        if (id === 'ghost' && ! this.reference) {
+            window.alert("The ghost brush traces from a reference. Pick one under Compare first " +
+                "(e.g. \"Lexy (original)\" or load a PNG).");
+            return;
+        }
         this.tool = id;
         for (let [k, b] of Object.entries(this.tool_buttons)) b.classList.toggle('--pressed', k === id);
     }
@@ -4757,7 +4768,7 @@ class TileEditorOverlay extends DialogOverlay {
             ev.preventDefault();
             let [px, py] = to_px(ev);
             if (this.tool === 'eyedropper') { this._pick(px, py); return; }
-            if (this.tool !== 'eraser') this._note_recent(this.color);
+            if (this.tool !== 'eraser' && this.tool !== 'ghost') this._note_recent(this.color);
             if (this.tool === 'line' || this.tool === 'rect') {
                 this._push_undo();
                 this._drag = {x0: px, y0: py, x1: px, y1: py};
@@ -4789,6 +4800,19 @@ class TileEditorOverlay extends DialogOverlay {
 
     _set_pixel(px, py) {
         let [gx, gy] = this._sheet_xy(px, py);
+        if (this.tool === 'ghost') {
+            // Stamp the matching pixel from the reference ("ghost") tileset onto the sheet.
+            let rd = this._ref_cell_data();
+            if (! rd) return;
+            let i = (py * this.TS + px) * 4;
+            let a = rd.data[i + 3];
+            this.sctx.clearRect(gx, gy, 1, 1);
+            if (a > 0) {
+                this.sctx.fillStyle = `rgba(${rd.data[i]},${rd.data[i + 1]},${rd.data[i + 2]},${a / 255})`;
+                this.sctx.fillRect(gx, gy, 1, 1);
+            }
+            return;
+        }
         this.sctx.clearRect(gx, gy, 1, 1);
         if (this.tool !== 'eraser') {
             this.sctx.fillStyle = this.color;
@@ -4796,6 +4820,23 @@ class TileEditorOverlay extends DialogOverlay {
         }
     }
     _paint(px, py) { this._set_pixel(px, py); this._redraw_edit(); }
+
+    // ImageData of the reference tileset's current cell (TS×TS), cached per cell/reference.
+    _ref_cell_data() {
+        if (! this.reference) return null;
+        let key = `${this.cell.c},${this.cell.r}`;
+        if (this._ref_cache && this._ref_cache.ref === this.reference && this._ref_cache.key === key) {
+            return this._ref_cache.data;
+        }
+        let TS = this.TS;
+        let cv = mk('canvas', {width: TS, height: TS});
+        let cx = cv.getContext('2d');
+        cx.imageSmoothingEnabled = false;
+        cx.drawImage(this.reference.image, this.cell.c * TS, this.cell.r * TS, TS, TS, 0, 0, TS, TS);
+        let data = cx.getImageData(0, 0, TS, TS);
+        this._ref_cache = {ref: this.reference, key, data};
+        return data;
+    }
 
     // Bresenham line / rectangle outline points within the cell
     _shape_points(d) {
