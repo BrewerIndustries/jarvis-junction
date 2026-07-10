@@ -128,4 +128,27 @@ Output lands in `tileset-src/extract/<name>/` (git-ignored):
 - `index.md` + `manifest.json` — map each file back to its tile name / frame / `col,row`.
 - add `--all` to also dump **every** non-empty grid cell by coordinate into `cells/`.
 
+## Importing — a full card or individual tiles
+
+```bash
+python3 tileset-src/tileset-tool.py import SOURCE [--onto BASE] [--out FILE] [--pack]
+```
+
+The inverse of `extract` — rebuilds a full sheet from either:
+- **a full-card PNG** (a 1024×1024 sheet), or
+- **a folder of individual tiles** named the way `extract` writes them
+  (`key_red.png`, `player__f03.png`, `c16_r00.png`). Only the tiles you supply are placed,
+  so you can drop in just the sprites you changed.
+
+Options:
+- `--onto BASE` — what the tiles paste onto: `current` (the live `tileset-lexy.png`, so
+  untouched tiles keep their art — the default), `blank` (transparent), or a path to any sheet.
+- `--out FILE` — where to write the result (default `tileset-src/import-out.png`).
+- `--pack` — install the result as the game tileset immediately (same as running `pack`).
+- Tiles that aren't 32×32 (e.g. AI output at 2×) are auto-resized down with nearest-neighbour.
+
+Round-trip: `extract` → edit / regenerate individual tiles → `import` → preview in-game
+(Options → Tilesets → Load custom tileset) or `--pack` to ship. Verified lossless: importing
+an unedited extract reproduces every named cell exactly.
+
 Requires Pillow: `pip3 install Pillow`.

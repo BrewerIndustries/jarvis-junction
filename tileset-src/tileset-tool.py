@@ -13,8 +13,10 @@ Usage (from repo root):
   python3 tileset-src/tileset-tool.py atlas          # rebuild the labelled atlas
   python3 tileset-src/tileset-tool.py extract [FILE] [OUT] [--all]
                                                      # full sheet + a folder of per-tile PNGs
+  python3 tileset-src/tileset-tool.py import SOURCE [--onto BASE] [--out FILE] [--pack]
+                                                     # rebuild a sheet from a card or per-tile PNGs
 """
-import sys, os, shutil, json, subprocess
+import sys, os, re, shutil, json, subprocess
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -154,6 +156,88 @@ def extract(path=None, outdir=None, dump_all=False):
     if not dump_all:
         print("  (add --all to also dump every non-empty grid cell by coordinate)")
 
+def _cells_for_filename(stem):
+    """Map an individual-tile filename (no extension) back to grid cell(s), matching the
+    names `extract` writes: `<tile>` (all its cells), `<tile>__fNN` (frame NN), `c<col>_r<row>`."""
+    m = re.fullmatch(r"c(\d+)_r(\d+)", stem)
+    if m:
+        return [(int(m.group(1)), int(m.group(2)))]
+    if "__f" in stem:
+        tile, fr = stem.rsplit("__f", 1)
+        if tile in CELLS and fr.isdigit() and int(fr) < len(CELLS[tile]):
+            return [tuple(CELLS[tile][int(fr)])]
+        return None
+    if stem in CELLS:
+        return [tuple(c) for c in CELLS[stem]]  # a bare tile name fills every cell it owns
+    return None
+
+def do_import(source, onto=None, out=None, do_pack=False):
+    """Rebuild a full sheet from a full-card PNG, or from a folder of individual tiles
+    (as produced by `extract`).  Folder tiles are pasted back onto a base sheet by name,
+    so you only need to supply the tiles you changed."""
+    if not os.path.exists(source):
+        sys.exit(f"no such file/folder: {source}")
+    out = out or os.path.join(HERE, "import-out.png")
+
+    if os.path.isfile(source):
+        sheet = Image.open(source).convert("RGBA")
+        if sheet.size != SIZE:
+            sys.exit(f"a full-card import must be {SIZE}; got {sheet.size}. "
+                     "For a folder of individual tiles, pass the folder instead.")
+        summary = "imported full sheet"
+    else:
+        # Choose the base the tiles paste onto: current art (keep untouched tiles), a named
+        # sheet, or a blank transparent sheet.
+        if onto in (None, "current", "sheet"):
+            base = SHEET
+        elif onto in ("blank", "none", "transparent"):
+            base = None
+        else:
+            base = onto
+        if base:
+            if not os.path.exists(base):
+                sys.exit(f"no base sheet: {base}")
+            sheet = Image.open(base).convert("RGBA")
+            if sheet.size != SIZE:
+                sheet = sheet.resize(SIZE, Image.NEAREST)
+        else:
+            sheet = Image.new("RGBA", SIZE, (0, 0, 0, 0))
+
+        # Prefer tiles/ + cells/ subfolders (an extract dir); else the folder itself.
+        dirs = [d for d in (os.path.join(source, "tiles"), os.path.join(source, "cells"))
+                if os.path.isdir(d)] or [source]
+        files = sorted(os.path.join(d, fn) for d in dirs for fn in os.listdir(d)
+                       if fn.lower().endswith(".png"))
+        placed, resized, skipped = 0, 0, []
+        for path in files:
+            coords = _cells_for_filename(os.path.basename(path)[:-4])
+            if coords is None:
+                skipped.append(os.path.basename(path))
+                continue
+            tile = Image.open(path).convert("RGBA")
+            if tile.size != (T, T):
+                tile = tile.resize((T, T), Image.NEAREST)
+                resized += 1
+            for (col, row) in coords:
+                sheet.paste(tile, (col*T, row*T))  # replace the whole cell (incl. alpha)
+                placed += 1
+        if placed == 0:
+            sys.exit("no placeable tiles found — expected names like player__f00.png, "
+                     "key_red.png, or c16_r00.png.")
+        summary = f"placed {placed} tiles"
+        if resized: summary += f" ({resized} resized to 32x32)"
+        if skipped:
+            print(f"skipped {len(skipped)} unrecognised file(s): {', '.join(skipped[:6])}"
+                  + (" …" if len(skipped) > 6 else ""))
+
+    sheet.save(out)
+    print(f"{summary} -> {os.path.relpath(out, ROOT)}")
+    if do_pack:
+        pack(out)
+    else:
+        print("Preview it in-game: Options -> Tilesets -> Load custom tileset.")
+        print(f"Or install it as the default:  python3 tileset-src/tileset-tool.py pack {os.path.relpath(out, ROOT)}")
+
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
     if cmd == "export": export()
@@ -168,6 +252,20 @@ def main():
         args = [a for a in args if a != "--all"]
         extract(args[0] if len(args) > 0 else None,
                 args[1] if len(args) > 1 else None, dump_all)
+    elif cmd == "import":
+        args = sys.argv[2:]
+        do_pack = "--pack" in args
+        args = [a for a in args if a != "--pack"]
+        onto = out = None
+        positional = []
+        i = 0
+        while i < len(args):
+            if args[i] == "--onto" and i + 1 < len(args): onto = args[i + 1]; i += 2
+            elif args[i] == "--out" and i + 1 < len(args): out = args[i + 1]; i += 2
+            else: positional.append(args[i]); i += 1
+        if not positional:
+            sys.exit("usage: tileset-tool.py import SOURCE [--onto BASE] [--out FILE] [--pack]")
+        do_import(positional[0], onto, out, do_pack)
     else: print(__doc__)
 
 if __name__ == "__main__":
