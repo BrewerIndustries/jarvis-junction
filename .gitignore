@@ -4,3 +4,5 @@
 * [0-9].*
 # tileset reskin working area (regenerate with tileset-tool.py export)
 tileset-src/template/
+# extracted tiles (regenerate with tileset-tool.py extract)
+tileset-src/extract/

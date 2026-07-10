@@ -103,10 +103,29 @@ git push origin dev            # updates the dev site
 | `tile-descriptions.json` | tile → plain-English "what it does" (used by the in-app legend) |
 | `make-tileset.py` | the procedural generator (one function per tile) |
 | `make-atlas-template.py` | rebuilds the atlas + index from the current sheet |
-| `tileset-tool.py` | `export` / `pack FILE` / `regen` / `atlas` |
+| `tileset-tool.py` | `export` / `pack FILE` / `regen` / `atlas` / `extract` |
 
 - `python3 tileset-src/tileset-tool.py regen` — rebuild the whole sheet from the
   procedural generators (after you tweak a generator in `make-tileset.py`).
 - `python3 tileset-src/tileset-tool.py atlas` — rebuild just the labelled atlas.
+
+## Extracting a tileset into individual tiles
+
+```bash
+python3 tileset-src/tileset-tool.py extract [FILE] [OUTDIR] [--all]
+```
+
+Slices a tileset into **the full sheet** plus a **folder of one PNG per named tile** —
+handy for editing a single sprite, feeding tiles to an image model one at a time, or
+building references. Works on any lexy-layout sheet: the default `tileset-lexy.png`, the
+bundled `reference-lexy.png`, or an edited sheet you downloaded from the game
+(Options → Tilesets → ⤓ Download tileset).
+
+Output lands in `tileset-src/extract/<name>/` (git-ignored):
+- `<name>.png` — the whole sheet (the "card").
+- `tiles/` — `floor.png`, `key_red.png`, … ; animated/multi-cell tiles are numbered
+  `player__f00.png`, `player__f01.png`, … in layout order.
+- `index.md` + `manifest.json` — map each file back to its tile name / frame / `col,row`.
+- add `--all` to also dump **every** non-empty grid cell by coordinate into `cells/`.
 
 Requires Pillow: `pip3 install Pillow`.

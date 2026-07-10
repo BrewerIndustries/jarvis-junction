@@ -7,10 +7,12 @@ overlay), paint over the cells, then PACK it back into the game — or just uplo
 the edited PNG in-game via Options -> Tilesets -> Load custom tileset.
 
 Usage (from repo root):
-  python3 tileset-src/tileset-tool.py export      # -> tileset-src/template/
-  python3 tileset-src/tileset-tool.py pack FILE    # install FILE as the tileset
-  python3 tileset-src/tileset-tool.py regen        # rebuild the procedural sheet
-  python3 tileset-src/tileset-tool.py atlas        # rebuild the labelled atlas
+  python3 tileset-src/tileset-tool.py export        # -> tileset-src/template/
+  python3 tileset-src/tileset-tool.py pack FILE      # install FILE as the tileset
+  python3 tileset-src/tileset-tool.py regen          # rebuild the procedural sheet
+  python3 tileset-src/tileset-tool.py atlas          # rebuild the labelled atlas
+  python3 tileset-src/tileset-tool.py extract [FILE] [OUT] [--all]
+                                                     # full sheet + a folder of per-tile PNGs
 """
 import sys, os, shutil, json, subprocess
 from PIL import Image, ImageDraw
@@ -79,6 +81,79 @@ def pack(path):
     print(f"Installed {os.path.basename(path)} as tileset-lexy.png and refreshed the atlas.")
     print("Reload the game (or redeploy) to see it. To ship to prod, commit + promote via PR.")
 
+def extract(path=None, outdir=None, dump_all=False):
+    """Slice a tileset into the full sheet plus one PNG per named tile (animations
+    numbered __f00, __f01, …).  Names come from the lexy-layout tile map, so this works
+    on any lexy tileset — tileset-lexy.png, reference-lexy.png, or an edited sheet you
+    downloaded from the game."""
+    src = path or SHEET
+    if not os.path.exists(src):
+        sys.exit(f"no such file: {src}")
+    im = Image.open(src).convert("RGBA")
+    base = os.path.splitext(os.path.basename(src))[0]
+    out = outdir or os.path.join(HERE, "extract", base)
+    tiles_dir = os.path.join(out, "tiles")
+    os.makedirs(tiles_dir, exist_ok=True)
+
+    # The full "card": a copy of the whole sheet.
+    im.save(os.path.join(out, f"{base}.png"))
+
+    cols, rows = im.width // T, im.height // T
+    if (im.width, im.height) != SIZE:
+        print(f"note: {im.size} isn't the {SIZE} lexy grid; naming may be partial, "
+              "out-of-bounds cells skipped.")
+    crop = lambda c, r: im.crop((c*T, r*T, c*T+T, r*T+T))
+    blank = lambda cell: cell.getbbox() is None  # fully transparent
+
+    manifest, written, skipped = [], 0, 0
+    for name, cells in CELLS.items():
+        multi = len(cells) > 1
+        for i, (col, row) in enumerate(cells):
+            if col >= cols or row >= rows:
+                continue
+            cell = crop(col, row)
+            if blank(cell):
+                skipped += 1
+                continue
+            fname = f"{name}__f{i:02d}.png" if multi else f"{name}.png"
+            cell.save(os.path.join(tiles_dir, fname))
+            manifest.append({"file": f"tiles/{fname}", "tile": name,
+                             "frame": i, "col": col, "row": row})
+            written += 1
+
+    if dump_all:
+        cells_dir = os.path.join(out, "cells")
+        os.makedirs(cells_dir, exist_ok=True)
+        extra = 0
+        for row in range(rows):
+            for col in range(cols):
+                cell = crop(col, row)
+                if blank(cell):
+                    continue
+                cell.save(os.path.join(cells_dir, f"c{col:02d}_r{row:02d}.png"))
+                extra += 1
+
+    json.dump(manifest, open(os.path.join(out, "manifest.json"), "w"), indent=1)
+    with open(os.path.join(out, "index.md"), "w") as f:
+        f.write(f"# Extracted tiles — {base}\n\n")
+        f.write(f"Source `{os.path.relpath(src, ROOT)}` ({im.width}×{im.height}, "
+                f"{cols}×{rows} grid) — {written} tile files.\n\n")
+        f.write("| file | tile | frame | col,row |\n|---|---|---|---|\n")
+        for m in sorted(manifest, key=lambda m: (m["tile"], m["frame"])):
+            f.write(f"| `{m['file']}` | `{m['tile']}` | {m['frame']} | {m['col']},{m['row']} |\n")
+
+    rel = os.path.relpath(out, ROOT)
+    print(f"Extracted {base} -> {rel}/")
+    print(f"  {base}.png     the full card (whole sheet)")
+    print(f"  tiles/         {written} individual tile PNGs (animations are __f00, __f01, …)")
+    if skipped:
+        print(f"                 {skipped} empty/transparent cells skipped")
+    if dump_all:
+        print(f"  cells/         {extra} non-empty grid cells, by coordinate (c<col>_r<row>.png)")
+    print(f"  index.md + manifest.json   file -> tile / frame / col,row")
+    if not dump_all:
+        print("  (add --all to also dump every non-empty grid cell by coordinate)")
+
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
     if cmd == "export": export()
@@ -87,6 +162,12 @@ def main():
         pack(sys.argv[2])
     elif cmd == "regen": run("make-tileset.py"); run("make-atlas-template.py"); print("Rebuilt sheet + atlas.")
     elif cmd == "atlas": run("make-atlas-template.py"); print("Rebuilt atlas.")
+    elif cmd == "extract":
+        args = sys.argv[2:]
+        dump_all = "--all" in args
+        args = [a for a in args if a != "--all"]
+        extract(args[0] if len(args) > 0 else None,
+                args[1] if len(args) > 1 else None, dump_all)
     else: print(__doc__)
 
 if __name__ == "__main__":
