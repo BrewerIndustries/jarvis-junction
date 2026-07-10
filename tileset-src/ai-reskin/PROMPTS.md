@@ -13,6 +13,40 @@ sheet afterward, then clean up in the in‑app editor.
 Reference image: **`jarvis-reference.png`** (front view; it's the only view that exists
 yet — the model must infer back/side views from it plus the fox's poses).
 
+## Step 0 — lock Jarvis's four views (do this FIRST)
+
+Before any pose blocks, get a clean 4‑direction turnaround so Jarvis stays identical
+everywhere. Attach **`turnaround-fox.png`** (Image A — the fox standing in the four game
+facings) and **`jarvis-reference.png`** (Image B), then paste:
+
+> You are an expert pixel‑art sprite artist for a 32×32 tile game. I need a **4‑direction
+> turnaround** of my character **Jarvis the butler** so he stays consistent across a whole
+> animation set.
+>
+> **Image A** shows how the character faces each direction — it's the game's original
+> protagonist (a small fox) standing still, as a strip of four 32×32 cells, **left to
+> right: back (facing away), right, front (facing the camera), left.** Use it ONLY as a
+> guide to silhouette, size, position‑in‑cell, and which way the character looks — not for
+> the design.
+>
+> **Image B** is Jarvis's current front view: dark side‑parted hair, pale skin, black
+> tailcoat, white shirt‑front, crimson bow‑tie.
+>
+> **Task:** Draw **Jarvis** standing still in those same four facings, as a single
+> horizontal strip of **four 32×32 cells, left to right: back, right, front, left.** Same
+> body, proportions, and colours as Image B in every view — only the viewing angle changes:
+> **back** = we see the back of his head/hair and coat, no face; **sides** = profile with
+> the bow‑tie edge‑on and hair parting to one side; **left is the right view mirrored.**
+>
+> **Rules:** true pixel art, hard edges, **no anti‑aliasing**, small flat palette, 1‑px
+> dark outline, transparent background, four equal 32×32 cells (**128×32** total),
+> grid‑aligned. Jarvis must be unmistakably the same character in all four.
+
+**Then:** pick the best result, downscale to 32 px/cell, and **use that turnaround as your
+`jarvis-reference` for every block below** (attach it as Image B instead of the front‑only
+image). Consistent input → consistent output. If a facing comes out weak, re‑roll just that
+view or fix it with the ghost brush before moving on.
+
 ## The blocks
 
 Each fox strip is the original **Lexy** protagonist. Cells are **32×32**, shown at 8×
