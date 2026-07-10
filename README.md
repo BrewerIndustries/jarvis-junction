@@ -46,7 +46,8 @@ It's static JS with **no build system**: serve the directory and open it in a br
   apply). Applying registers + selects the target row so a later **Save can't clobber it**.
   The editor's **"Editing:" source picker** chooses which tileset you paint, and an
   **"Active skin" dropdown** switches the live in-game tileset instantly for every format
-  at once.
+  at once. Two built-in skins ship: **Jarvis's Junction** (the butler art) and **Lexy
+  (original)** — eevee's original CC-BY-SA art, kept as a known-good reference to test against.
 - ⏳ Next (per DESIGN.md): accessibility (colorblind palette, remappable keys),
   progression (medals/Daily Duty), the manor-hub campaign. Original tileset art +
   servers are later.

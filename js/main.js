@@ -3272,6 +3272,15 @@ const BUILTIN_TILESETS = {
         tile_width: 32,
         tile_height: 32,
     },
+    // eevee's original Lexy's Labyrinth art (CC BY-SA 4.0), bundled as reference-lexy.png.
+    // Offered as a selectable skin so there's a known-good standard to test against.
+    'lexy-original': {
+        name: "Lexy (original)",
+        src: 'reference-lexy.png',
+        layout: 'lexy',
+        tile_width: 32,
+        tile_height: 32,
+    },
 };
 
 const BLOCKED_GLIDERBOT_SETS = new Set([
@@ -3490,8 +3499,10 @@ class OptionsOverlay extends DialogOverlay {
                 newdef.tileset = new Tileset(
                     img, TILESET_LAYOUTS[newdef.layout ?? 'lexy'],
                     newdef.tile_width, newdef.tile_height);
-                // Register it so fallbacks and comparisons resolve consistently.
+                // Register it so fallbacks and comparisons resolve consistently, and redraw
+                // its row's preview once the image decodes (it isn't ready synchronously).
                 conductor._loaded_tilesets[ident] = newdef.tileset;
+                img.addEventListener('load', () => this._redraw_tileset_previews(ident));
             }
             this.available_tilesets[ident] = newdef;
         }
