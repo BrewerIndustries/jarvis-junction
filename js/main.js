@@ -3757,10 +3757,13 @@ class OptionsOverlay extends DialogOverlay {
         let canvas = mk('canvas', {width: img.naturalWidth || img.width, height: img.naturalHeight || img.height});
         canvas.getContext('2d').drawImage(img, 0, 0);
         let tileset = new Tileset(canvas, src.layout, src.size_x, src.size_y);
+        // Carry over the source's saved palette, if it has one.
+        let src_rec = def.is_user ? load_json_from_storage(CUSTOM_TILESET_PREFIX + ident) : null;
         try {
             save_json_to_storage(CUSTOM_TILESET_PREFIX + name, {
                 ident: name, name, layout: src.layout['#ident'],
                 tile_width: src.size_x, tile_height: src.size_y, src: canvas.toDataURL('image/png'),
+                ...(src_rec && src_rec.palette ? { palette: src_rec.palette } : {}),
             });
         }
         catch (err) {
@@ -4253,11 +4256,26 @@ function compute_cell_labels(tileset) {
     return cells;
 }
 
+// Default working palette (48 = 6 rows of 8). The editor shows three more rows on top
+// for recently-used colours, tripling the visible swatches from the old 24.
 const EDITOR_PALETTE = [
-    '#000000', '#3a2c20', '#6b5340', '#a9805a', '#caa25a', '#e8c46a', '#f4e2a6', '#ffffff',
-    '#8a2e2e', '#c0392b', '#e07a3c', '#d9a441', '#7a8a4a', '#4a8a5a', '#3a6d8c', '#5f9cc4',
-    '#b06a44', '#a86848', '#8fd0e8', '#a6e3c0', '#d4a2c4', '#9a6db0', '#c8b89a', '#8c7c68',
+    // grayscale ramp
+    '#000000', '#1c1c1c', '#3a3a3a', '#585858', '#7a7a7a', '#9c9c9c', '#c8c8c8', '#ffffff',
+    // warm woods / browns
+    '#2a1c12', '#3a2c20', '#5a4030', '#6b5340', '#8a6a48', '#a9805a', '#c8a06a', '#e6c98c',
+    // gold / skin / parchment
+    '#7a5a2a', '#a97e3a', '#caa25a', '#e8c46a', '#f4e2a6', '#f6d3a0', '#e8b58a', '#c98a5a',
+    // greens
+    '#1e3320', '#2f5a2f', '#4a8a3a', '#6aa84a', '#7a8a4a', '#9cc45a', '#4a8a5a', '#a6e3c0',
+    // blues / cyans
+    '#16283a', '#22405a', '#3a6d8c', '#5f9cc4', '#8fd0e8', '#3a5a8c', '#5a7ac4', '#aacbe8',
+    // reds / oranges / purples / pinks
+    '#5a1e1e', '#8a2e2e', '#c0392b', '#e07a3c', '#a86848', '#9a6db0', '#c47ab0', '#d4a2c4',
 ];
+const EDITOR_PALETTE_COLS = 8;
+const EDITOR_RECENT_ROWS = 3;
+const EDITOR_RECENT_CAP = EDITOR_PALETTE_COLS * EDITOR_RECENT_ROWS;  // 24
+const EDITOR_RECENT_KEY = "Lexy's Labyrinth editor recent colors";
 
 class TileEditorOverlay extends DialogOverlay {
     constructor(conductor, sources, initial_ident, options_overlay = null) {
@@ -4284,8 +4302,11 @@ class TileEditorOverlay extends DialogOverlay {
         this.ghost_alpha = 0.5; // opacity of the reference ghost overlay
         this._drag = null;      // {x0,y0,x1,y1} while dragging a line/rect
         this._dirty = false;    // unapplied edits to the current source?
+        this.palette = EDITOR_PALETTE.slice();   // working palette (per-tileset)
+        this.recent = load_json_from_storage(EDITOR_RECENT_KEY) || [];  // MRU used colours
 
         this._build_sheet_from(this.sources[this.source_ident].tileset);
+        this._load_palette_for_source();
 
         this._build_ui();
         this._load_cell(0);
@@ -4329,6 +4350,8 @@ class TileEditorOverlay extends DialogOverlay {
         }
         this.source_ident = ident;
         this._build_sheet_from(this.sources[ident].tileset);
+        this._load_palette_for_source();
+        this._render_palette();
         this._dirty = false;
         // Resize the edit canvas if this source has a different tile size.
         let CV = this.TS * this.zoom;
@@ -4372,14 +4395,22 @@ class TileEditorOverlay extends DialogOverlay {
         this.onion_cb = mk('input', {type: 'checkbox'});
         this.onion_cb.addEventListener('change', () => { this.onion = this.onion_cb.checked; this._redraw_edit(); });
 
-        // -- palette --
-        let pal = mk('div.-palette');
-        for (let c of EDITOR_PALETTE) {
-            let sw = mk('button.-swatch', {type: 'button', title: c});
-            sw.style.background = c;
-            sw.addEventListener('click', () => this._set_color(c));
-            pal.append(sw);
-        }
+        // -- palette: recently-used rows on top, working palette below, + a setup menu --
+        this.recent_grid = mk('div.-palette.-recent');
+        this.palette_grid = mk('div.-palette');
+        let fill_b = mk('button.-pal-setup-btn', {type: 'button',
+            title: 'Fill the palette with the most-used colours in this tileset'}, "⛏ From tileset");
+        fill_b.addEventListener('click', () => this._fill_palette_from_tileset());
+        let reset_b = mk('button.-pal-setup-btn', {type: 'button',
+            title: 'Reset the palette to the defaults'}, "↺ Reset");
+        reset_b.addEventListener('click', () => this._reset_palette());
+        let palette_box = mk('div.-palette-box',
+            mk('div.-pal-label', "Recent"),
+            this.recent_grid,
+            mk('div.-pal-label', "Palette"),
+            this.palette_grid,
+            mk('div.-pal-setup', fill_b, reset_b),
+        );
         this.color_input = mk('input', {type: 'color', value: this.color});
         this.color_input.addEventListener('input', ev => this._set_color(ev.target.value, false));
 
@@ -4441,7 +4472,7 @@ class TileEditorOverlay extends DialogOverlay {
                     tool_row,
                     mk('div.-actions', copy_b, this.paste_b, undo_b),
                     mk('div.-actions', flip_h_b, flip_v_b),
-                    pal,
+                    palette_box,
                     mk('label.-custom-color', "custom ", this.color_input),
                     mk('label.-onion', this.onion_cb, " onion skin"),
                 ),
@@ -4469,6 +4500,7 @@ class TileEditorOverlay extends DialogOverlay {
         );
         this._set_tool('pencil');
         this._set_color(this.color);
+        this._render_palette();
         this._refresh_minimap();
     }
 
@@ -4479,6 +4511,105 @@ class TileEditorOverlay extends DialogOverlay {
     _set_color(c, update_input = true) {
         this.color = c;
         if (update_input && this.color_input) this.color_input.value = c;
+        this._sync_palette_selection();
+    }
+
+    // ---- palette -----------------------------------------------------------
+    _render_palette() {
+        if (! this.palette_grid) return;
+        // Recent (top rows): MRU colours, padded to a full grid with empty slots.
+        this.recent_grid.textContent = '';
+        for (let i = 0; i < EDITOR_RECENT_CAP; i++) {
+            let c = this.recent[i];
+            if (c) {
+                let sw = mk('button.-swatch', {type: 'button', title: c + " (recent)"});
+                sw.style.background = c;
+                sw.addEventListener('click', () => this._set_color(c));
+                this.recent_grid.append(sw);
+            }
+            else {
+                this.recent_grid.append(mk('div.-swatch.-empty'));
+            }
+        }
+        // Working palette.
+        this.palette_grid.textContent = '';
+        for (let c of this.palette) {
+            let sw = mk('button.-swatch', {type: 'button', title: c});
+            sw.style.background = c;
+            sw.addEventListener('click', () => this._set_color(c));
+            this.palette_grid.append(sw);
+        }
+        this._sync_palette_selection();
+    }
+
+    _sync_palette_selection() {
+        if (! this.palette_grid) return;
+        let cur = (this.color || '').toLowerCase();
+        for (let sw of [...this.recent_grid.children, ...this.palette_grid.children]) {
+            if (! sw.classList) continue;
+            let bg = (sw.title || '').split(' ')[0].toLowerCase();
+            sw.classList.toggle('--current', !!bg && bg === cur);
+        }
+    }
+
+    // Record a colour as recently-used (MRU, deduped, capped) and persist globally.
+    _note_recent(c) {
+        if (! c) return;
+        c = c.toLowerCase();
+        let i = this.recent.findIndex(x => x.toLowerCase() === c);
+        if (i === 0) return;                 // already most-recent, nothing to do
+        if (i > 0) this.recent.splice(i, 1);
+        this.recent.unshift(c);
+        if (this.recent.length > EDITOR_RECENT_CAP) this.recent.length = EDITOR_RECENT_CAP;
+        try { save_json_to_storage(EDITOR_RECENT_KEY, this.recent); } catch (e) {}
+        this._render_palette();
+    }
+
+    // Load the working palette for the current source (per-tileset, if it has one saved).
+    _load_palette_for_source() {
+        let def = this.sources[this.source_ident];
+        let rec = (def && def.is_user) ? load_json_from_storage(CUSTOM_TILESET_PREFIX + this.source_ident) : null;
+        this.palette = (rec && Array.isArray(rec.palette) && rec.palette.length)
+            ? rec.palette.slice() : EDITOR_PALETTE.slice();
+    }
+
+    // Persist the working palette onto the current tileset's stored record (user sets only).
+    _save_palette() {
+        let def = this.sources[this.source_ident];
+        if (! def || ! def.is_user) return;
+        let rec = load_json_from_storage(CUSTOM_TILESET_PREFIX + this.source_ident);
+        if (! rec) return;
+        rec.palette = this.palette;
+        try { save_json_to_storage(CUSTOM_TILESET_PREFIX + this.source_ident, rec); }
+        catch (err) { console.error("Couldn't save palette:", err); }
+    }
+
+    // Setup menu: fill the palette with the most-used colours in this tileset.
+    _fill_palette_from_tileset() {
+        let d = this.sctx.getImageData(0, 0, this.sheet.width, this.sheet.height).data;
+        let counts = new Map();
+        for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] < 8) continue;      // skip (near-)transparent
+            let hex = '#' + [d[i], d[i + 1], d[i + 2]]
+                .map(v => v.toString(16).padStart(2, '0')).join('');
+            counts.set(hex, (counts.get(hex) || 0) + 1);
+        }
+        let top = [...counts.entries()].sort((a, b) => b[1] - a[1])
+            .slice(0, EDITOR_PALETTE.length).map(e => e[0]);
+        if (! top.length) return;
+        this.palette = top;
+        this._render_palette();
+        this._save_palette();
+        if (! (this.sources[this.source_ident] || {}).is_user) {
+            window.alert("Filled the palette from this tileset. (It's a built-in, so the palette " +
+                "resets when you reopen — duplicate it first to keep a custom palette.)");
+        }
+    }
+
+    _reset_palette() {
+        this.palette = EDITOR_PALETTE.slice();
+        this._render_palette();
+        this._save_palette();
     }
 
     _tile_frames() { return this.cells.filter(c => c.tile === this.cell.tile); }
@@ -4626,6 +4757,7 @@ class TileEditorOverlay extends DialogOverlay {
             ev.preventDefault();
             let [px, py] = to_px(ev);
             if (this.tool === 'eyedropper') { this._pick(px, py); return; }
+            if (this.tool !== 'eraser') this._note_recent(this.color);
             if (this.tool === 'line' || this.tool === 'rect') {
                 this._push_undo();
                 this._drag = {x0: px, y0: py, x1: px, y1: py};
@@ -4844,6 +4976,7 @@ class TileEditorOverlay extends DialogOverlay {
                 ident: target, name: target_name,
                 layout: this.layout['#ident'], tile_width: this.TS, tile_height: this.TS,
                 src: this.sheet.toDataURL('image/png'),
+                palette: this.palette,   // keep the tileset's palette alongside its art
             });
             for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = target;
             this.conductor.save_stash();

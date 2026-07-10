@@ -3101,9 +3101,22 @@ body {
 .dialog-tile-editor .-tools { display: flex; flex-wrap: wrap; gap: 5px; }
 .dialog-tile-editor .-tools button { flex: 1 1 46%; }
 .dialog-tile-editor button.--pressed { background: hsl(var(--main-hue), 80%, 45%); }
-.dialog-tile-editor .-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.dialog-tile-editor .-palette-box { display: flex; flex-direction: column; gap: 3px; }
+.dialog-tile-editor .-pal-label {
+    font-size: 0.68em; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted, #8c7d69); margin-top: 2px;
+}
+.dialog-tile-editor .-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+.dialog-tile-editor .-recent { gap: 3px; }
 .dialog-tile-editor .-swatch { width: 100%; aspect-ratio: 1; padding: 0; border: 1px solid #0004; border-radius: 3px; cursor: pointer; }
 .dialog-tile-editor .-swatch:hover { outline: 2px solid hsl(var(--main-hue), 70%, 50%); outline-offset: 1px; }
+.dialog-tile-editor .-swatch.--current { outline: 2px solid #fff; outline-offset: 0; box-shadow: 0 0 0 2px #000a; }
+.dialog-tile-editor .-swatch.-empty {
+    cursor: default; border-style: dashed; border-color: #0002; background: #0000000d;
+}
+.dialog-tile-editor .-swatch.-empty:hover { outline: none; }
+.dialog-tile-editor .-pal-setup { display: flex; gap: 4px; margin-top: 2px; }
+.dialog-tile-editor .-pal-setup-btn { flex: 1; font-size: 0.72em; padding: 3px 4px; }
 .dialog-tile-editor .-custom-color { display: flex; align-items: center; gap: 6px; font-size: 0.85em; }
 .dialog-tile-editor .-center { display: flex; flex-direction: column; gap: 8px; }
 .dialog-tile-editor .-nav { display: flex; gap: 8px; align-items: center; }
@@ -3124,7 +3137,14 @@ body {
 .dialog-tile-editor .-tools button { flex: 1 1 30%; font-size: 1.1em; padding: 4px; }
 .dialog-tile-editor .-actions { display: flex; gap: 5px; }
 .dialog-tile-editor .-actions button { flex: 1; }
-.dialog-tile-editor .-onion { display: flex; align-items: center; gap: 6px; font-size: 0.85em; }
+.dialog-tile-editor .-onion {
+    display: flex; align-items: center; gap: 6px; font-size: 0.85em;
+    padding: 3px 6px; border: 2px solid #39d353; border-radius: 4px;
+}
+.dialog-tile-editor .-onion:has(:checked) {
+    background: #39d3531f; box-shadow: 0 0 6px #39d35366;
+}
+.dialog-tile-editor .-onion :checked { accent-color: #39d353; }
 .dialog-tile-editor .-right { display: flex; flex-direction: column; gap: 8px; width: 210px; flex: 0 0 auto; }
 .dialog-tile-editor .-right h3 { margin: 6px 0 2px; font-size: 0.95em; color: hsl(var(--main-hue), 40%, 35%); }
 .dialog-tile-editor .-ref-select { width: 100%; }

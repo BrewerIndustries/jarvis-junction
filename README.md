@@ -30,11 +30,13 @@ It's static JS with **no build system**: serve the directory and open it in a br
   hook, honoring `prefers-reduced-motion`; plus a game-speed slider, effects
   toggle, last-pressed-wins key override, and input buffering.
 - ✅ **In-app tile editor** (Options → Tilesets → *Edit tiles in-app*): a Piskel-style
-  pixel editor — pencil/eraser/fill/line/rect, palette + custom color, undo, copy/paste,
-  reflect (flip horizontal/vertical), onion skin, a searchable per-cell navigator, and a
-  whole-tileset board (click any cell to edit). **Compare** ghost-overlays a reference set
-  (the original Lexy art, or any PNG you load) on the canvas for tracing, with a
-  ghost-opacity slider and hold-`\` peek.
+  pixel editor — pencil/eraser/fill/line/rect, undo, copy/paste, reflect (flip
+  horizontal/vertical), onion skin, a searchable per-cell navigator, and a whole-tileset
+  board (click any cell to edit). The **palette** has a recently-used strip (top 3 rows,
+  MRU, persisted) over a 48-swatch working palette, a **"from tileset"** setup that fills
+  it with the sheet's most-used colours, and a custom-colour picker — palette changes save
+  with the tileset. **Compare** ghost-overlays a reference set (the original Lexy art, or
+  any PNG you load) on the canvas for tracing, with a ghost-opacity slider and hold-`\` peek.
   **Named user tilesets** (not a single shared "Editor" bucket): each is stored
   independently under its name and enumerated straight from `localStorage`, so nothing
   gets lost. The Tilesets table gives every set contextual actions — **Duplicate** (any
