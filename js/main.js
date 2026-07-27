@@ -2528,6 +2528,7 @@ class Player extends PrimaryView {
                     savefile.total_levels = this.conductor.stored_game.level_metadata.length;
                     savefile.scorecards[level_index] = new_scorecard;
                     this.conductor.save_savefile();
+                    if (window.Arcade) { Arcade.report('score', savefile.total_score||0); Arcade.report('aidless', savefile.aidless_levels||0); }
                 }
 
                 overlay.setAttribute('data-reason', 'success');
