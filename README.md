@@ -11,11 +11,46 @@ It's static JS with **no build system**: serve the directory and open it in a br
 ## Status
 
 - ✅ Forked from Lexy's Labyrinth upstream (2026-07-06), engine runs unmodified.
-- ✅ Rebranded visible title to *Jarvis's Junction* (`index.html`).
+- ✅ Rebranded to *Jarvis's Junction* + butler-theme splash/pack copy (`index.html`,
+  `js/main.js` `BUILTIN_PACKS`).
 - ✅ Removed `tileset-tworld.png` (the vendored Tile World tileset — unused by the app
   and belongs to its owners).
-- ⏳ Deeper reskin (own icon/sprites/name inside the engine + editor) — not yet done.
-- ⏳ Deploy wiring (`.jarvis.json`, Launcher/Dashboard registry, subdomain) — not yet done.
+- ✅ **Live**: GitHub Pages at https://jarvis-junction.dabrewer.dev/ (prod) and
+  `/dev/` (dev); registered in the Launcher + Dashboard; idea-log card at *Building*.
+- ✅ v1 scope agreed — see [`DESIGN.md`](DESIGN.md).
+- ✅ **Diegetic butler theme**: warm brass/manor palette + serif type, "Master's
+  note" splash, rebranded packs ("inspired by Chip's Challenge"), in-game pack-name
+  override, butler UI labels (begin duty / duty roster / gratuity), and butler
+  death/win messages. Front page uses the **butler sprite** (`butler.png`) as the logo
+  (top splash + bottom bar); the "mode" (compat) button is text-only; the Lexy's
+  Labyrinth credit moved to Options → About and the Chip's Challenge trademark notice
+  to the foot of the splash.
+- ✅ **Game-feel juice** (`js/juice.js`): pickup particles, socket/bomb/death
+  screen-shake, "duty complete" confetti, mobile haptics — all off the sfx event
+  hook, honoring `prefers-reduced-motion`; plus a game-speed slider, effects
+  toggle, last-pressed-wins key override, and input buffering.
+- ✅ **In-app tile editor** (Options → Tilesets → *Edit tiles in-app*): a Piskel-style
+  pixel editor — pencil/eraser/fill/line/rect, a **ghost brush** that traces (stamps)
+  pixels down from the Compare reference into the cell, undo, copy/paste, reflect (flip
+  horizontal/vertical), onion skin, a searchable per-cell navigator, and a whole-tileset
+  board (click any cell to edit). The **palette** has a recently-used strip (top 3 rows,
+  MRU, persisted) over a 48-swatch working palette, a **"from tileset"** setup that fills
+  it with the sheet's most-used colours, and a custom-colour picker — palette changes save
+  with the tileset. **Compare** ghost-overlays a reference set (the original Lexy art, or
+  any PNG you load) on the canvas for tracing, with a ghost-opacity slider and hold-`\` peek.
+  **Named user tilesets** (not a single shared "Editor" bucket): each is stored
+  independently under its name and enumerated straight from `localStorage`, so nothing
+  gets lost. The Tilesets table gives every set contextual actions — **Duplicate** (any
+  set, prompts for a name), and **Edit / Rename / Delete** for your own. Built-ins are
+  read-only templates: editing one saves the result as a new named copy (Duplicate-on-
+  apply). Applying registers + selects the target row so a later **Save can't clobber it**.
+  The editor's **"Editing:" source picker** chooses which tileset you paint, and an
+  **"Active skin" dropdown** switches the live in-game tileset instantly for every format
+  at once. Two built-in skins ship: **Jarvis's Junction** (the butler art) and **Lexy
+  (original)** — eevee's original CC-BY-SA art, kept as a known-good reference to test against.
+- ⏳ Next (per DESIGN.md): accessibility (colorblind palette, remappable keys),
+  progression (medals/Daily Duty), the manor-hub campaign. Original tileset art +
+  servers are later.
 
 ## Run locally
 

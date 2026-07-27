@@ -556,14 +556,14 @@ for (let entry of Object.values(SPECIAL_PALETTE_ENTRIES)) {
 export const TILE_DESCRIPTIONS = {
     // Basics
     player: {
-        name: "Lexy",
+        name: "Jarvis",
         cc2_name: "Chip",
         desc: "The player, a fox girl who enjoys puzzles.  Slides on ice.  Can walk on dirt and gravel.  Reuses green keys.",
     },
     player2: {
         name: "Cerise",
         cc2_name: "Melinda",
-        desc: "The player, a gel rabbat who enjoys Lexy.  Walks on ice.  Stopped by dirt and gravel.  Reuses yellow keys.",
+        desc: "The player, a gel rabbat who enjoys Jarvis.  Walks on ice.  Stopped by dirt and gravel.  Reuses yellow keys.",
         min_version: 2,
     },
     hint: {
@@ -660,7 +660,7 @@ export const TILE_DESCRIPTIONS = {
     },
     no_player1_sign: {
         name: "'No foxes' sign",
-        desc: "Stops Lexy (and Doppel-Lexy).  No other effect.",
+        desc: "Stops Jarvis (and Doppel-Jarvis).  No other effect.",
     },
     no_player2_sign: {
         name: "'No bunnies' sign",
@@ -895,9 +895,9 @@ export const TILE_DESCRIPTIONS = {
         desc: "Follows the right wall.",
     },
     doppelganger1: {
-        name: "Doppel-Lexy",
+        name: "Doppel-Jarvis",
         cc2_name: "Mirror Chip",
-        desc: "Copies Lexy's movements.  Does almost anything Lexy can do: collect items, push blocks, pass through tiles that block monsters, etc.  Cannot collect hearts.",
+        desc: "Copies Jarvis's movements.  Does almost anything Jarvis can do: collect items, push blocks, pass through tiles that block monsters, etc.  Cannot collect hearts.",
     },
     doppelganger2: {
         name: "Doppel-Cerise",
@@ -907,12 +907,12 @@ export const TILE_DESCRIPTIONS = {
     teeth: {
         name: "Red chomper",
         cc2_name: "Angry teeth",
-        desc: "Chases after Lexy.  Runs away from Cerise.  Pauses after each step.",
+        desc: "Chases after Jarvis.  Runs away from Cerise.  Pauses after each step.",
     },
     teeth_timid: {
         name: "Blue chomper",
         cc2_name: "Timid teeth",
-        desc: "Chases after Cerise.  Runs away from Lexy.  Pauses after each step.",
+        desc: "Chases after Cerise.  Runs away from Jarvis.  Pauses after each step.",
     },
     floor_mimic: {
         name: "Floor mimic",
@@ -1010,7 +1010,7 @@ export const TILE_DESCRIPTIONS = {
     },
     transmogrifier: {
         name: "Transmogrifier",
-        desc: "Changes most objects into corresponding opposites: Lexy ↔ Cerise, Doppel-Lexy ↔ Doppel-Cerise, dirt block ↔ ice block, bouncy ball ↔ walker, fireball → beetle → glider → millipede → fireball, blue tank ↔ yellow tank, red chomper ↔ blue chomper, blob → one of most monsters chosen at random.  If connected to wire, only functions while receiving power.",
+        desc: "Changes most objects into corresponding opposites: Jarvis ↔ Cerise, Doppel-Jarvis ↔ Doppel-Cerise, dirt block ↔ ice block, bouncy ball ↔ walker, fireball → beetle → glider → millipede → fireball, blue tank ↔ yellow tank, red chomper ↔ blue chomper, blob → one of most monsters chosen at random.  If connected to wire, only functions while receiving power.",
     },
     teleport_blue: {
         name: "Blue teleporter",

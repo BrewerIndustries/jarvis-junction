@@ -15,9 +15,18 @@ import SOUNDTRACK from './soundtrack.js';
 import { Tileset, TILESET_LAYOUTS, convert_tileset_to_layout, parse_tile_world_large_tileset, infer_tileset_from_image } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, mk_svg } from './util.js';
+import { EffectsLayer, screen_shake, haptic } from './juice.js';
+
+// Directional actions get "last-pressed-wins" override handling in get_input():
+// holding one direction then pressing another moves in the newer one, and
+// releasing it falls back to whatever direction is still held.
+const DIRECTIONAL_ACTIONS = new Set(['up', 'down', 'left', 'right']);
+// A tapped direction is remembered for a few tics so a press made slightly before
+// the game is ready to accept it isn't dropped (input buffering / move leniency).
+const INPUT_BUFFER_TICS = 4;
 import * as util from './util.js';
 
-const PAGE_TITLE = "Lexy's Labyrinth";
+const PAGE_TITLE = "Jarvis's Junction";
 // This prefix is LLDEMO in base64, used to be somewhat confident that a string is a valid demo
 // (it's 6 characters so it becomes exactly 8 base64 chars with no leftovers to entangle)
 const REPLAY_PREFIX = "TExERU1P";
@@ -65,191 +74,184 @@ function make_button(label, onclick) {
 // - level password, if any
 const OBITUARIES = {
     drowned: [
-        "you tried out water cooling",
-        "you fell into the c",
-        "water disaster!",
-        "you sank like a rock",
-        "your stack overflowed",
+        "you took an unscheduled bath",
+        "the Master won't be pleased about the carpet",
+        "a most undignified splash",
+        "you went quite overboard",
+        "butlers do not swim on duty",
     ],
     burned: [
-        "your core temp got too high",
-        "your plans went up in smoke",
-        "you held your feet to the fire",
-        "you really blazed through that one",
-        "you turned up the heat",
+        "you singed the good gloves",
+        "the Master likes his tea hot, not his butler",
+        "you let the matter get rather heated",
+        "you made a most warm exit",
+        "up in smoke, like the morning toast",
     ],
     slimed: [
-        "you mutated",
-        "quite a sticky situation",
-        "you were garbage collected",
-        "that'll leave a stain",
-        "what a waste",
+        "a dreadful mess to clean up",
+        "you'll want to change before dinner",
+        "the Master mustn't see you like this",
+        "that will never come out in the wash",
+        "how terribly unbecoming",
     ],
     exploded: [
-        "you blew it",
-        "you're having a blast",
-        "you became 64 bits",
-        "you will surely be mist",
-        "try not to trip",
+        "you mishandled the Master's effects",
+        "one does not touch the good china",
+        "a most explosive faux pas",
+        "you'll be dusting yourself off for weeks",
+        "that was decidedly not on today's list",
     ],
     squished: [
-        "you encountered a block of ram",
-        "you became two-dimensional",
-        "your hit box collided",
-        "nice compression ratio",
-        "you took a cube route",
+        "flattened in the line of duty",
+        "you were rather steamrolled",
+        "a pressing engagement, indeed",
+        "caught between a rock and a hard place",
+        "do mind where one stands",
     ],
     time: [
-        "you tried to overclock",
-        "you lost track of time",
-        "your speedrun went badly",
-        "you overslept",
-        "you got ticked off",
+        "you kept the Master waiting",
+        "punctuality is everything",
+        "tardiness ill becomes a butler",
+        "the clock waits for no one",
+        "you quite overslept your duties",
     ],
     electrocuted: [
-        "a shocking revelation",
-        "danger: high voltage",
-        "inadequate insulation",
-        "rode the lightning",
+        "a most shocking lapse",
+        "mind the wiring, do",
+        "you gave yourself quite a jolt",
+        "the Master's electrics are temperamental",
     ],
     fell: [
-        "some say she's still falling",
-        "look before you leap",
-        "where's my ladder",
-        "it's dark down here",
+        "mind the trapdoor next time",
+        "look before you leap, always",
+        "wherever has the good ladder got to",
+        "it is rather dark down here",
     ],
     generic: [
-        "you had a bad time",
+        "a poor showing, I'm afraid",
     ],
 
     // Specific creatures
     ball: [
-        "you're having a ball",
-        "you'll bounce back from this",
-        "should've gone the other way",
-        "ping?  pong!",
-        //"",
+        "bowled over by a runaway ball",
+        "the young master's toys, again",
+        "you ought to have stood aside",
+        "quite knocked off your feet",
+        "do keep the playthings tidied away",
     ],
     walker: [
-        "you let it walk all over you",
-        "step into, step over, step out",
-        "you wandered around at random",
-        //"",
-        //"",
+        "you let a guest walk all over you",
+        "one must yield to house guests",
+        "an aimless wanderer did you in",
+        "trampled in the corridor",
     ],
     fireball: [
-        "you had a meltdown",
-        "watch your core temp",
-        "you got roasted",
-        "you lost the flamewar",
-        "goodness gracious",
+        "you got too near the stove",
+        "the kitchen got the better of you",
+        "singed to a crisp",
+        "a most heated encounter",
+        "goodness, gracious",
     ],
     glider: [
-        "your ship came in",
-        "everything turned out fin",
-        "should've given it a wider berth",
-        "watch out for that skipper",
-        "don't harbor any resentment",
+        "swept away on a draught",
+        "you should have given it a wide berth",
+        "caught in the crossbreeze",
+        "mind the open windows",
+        "a most unwelcome gust",
     ],
     tank_blue: [
-        "watch where you tread",
-        "well, tanks for trying",
-        "should've reversed course",
-        "strayed from the straight and narrow",
-        "you charged in blindly",
+        "you strayed into its path",
+        "one ought not block the way",
+        "it would not be turned aside",
+        "you stood your ground unwisely",
+        "flattened by sheer stubbornness",
     ],
     tank_yellow: [
-        "things got out of control",
-        "you lost all direction",
-        "your chances of survival were remote",
-        //"
-        //"
+        "the contraption careened out of control",
+        "you lost all sense of direction",
+        "a wayward machine did you in",
     ],
     bug: [
-        "you got ants in your pants",
-        "you need to debug",
-        "all the pest to you",
-        //"
-        //"
+        "the house has a pest problem",
+        "vermin in the pantry, again",
+        "do ring for the exterminator",
     ],
     paramecium: [
-        "you got the creepy crawlies",
-        "you couldn't wriggle out of that one",
-        "you better leg it next time",
-        //"
-        //"
+        "something crept up on you",
+        "you couldn't shake it off",
+        "best leg it next time",
     ],
     teeth: [
-        "you got a mega bite",
-        "you got a little nybble",
-        "you're quite a mouthful",
-        "you passed the taste test",
-        "you ate it",
+        "the Master's hound found you",
+        "you were rather chewed out",
+        "quite a mouthful for the beast",
+        "you failed to charm the guard dog",
+        "bad dog!",
     ],
     teeth_timid: [
-        "you got a killer byte",
-        "you were nibbled to bits",
-        "you got a tongue-lashing",
-        "how unvoretunate",
+        "even the timid hound got you",
+        "nibbled while you dithered",
+        "you gave the pup an opening",
+        "how un-fetch-unate",
         "you had an acci-dent",
     ],
     blob: [
-        "your luck ran out",
-        "gooed job on that one",
-        "try gooing another way",
-        "what're the odds",
-        "ooze laughing now",
+        "you slipped in something dreadful",
+        "a spill got the better of you",
+        "do fetch a mop",
+        "what a sticky end",
+        "not a drop out of place, they said",
     ],
     doppelganger1: [
-        "you were outfoxed",
-        "you need some vixen up",
-        "take some time to reflect",
-        "you've been duped",
+        "outdone by your own reflection",
+        "do take a moment to reflect",
+        "you've been thoroughly upstaged",
+        "the looking-glass had other ideas",
         "stop hitting yourself",
     ],
     doppelganger2: [
-        "your plans just didn't gel",
-        "you got hopping mad",
-        "hare today, gone tomorrow",
+        "your double had the better of you",
+        "two butlers, one too many",
+        "here today, gone tomorrow",
         "she left quite an impression",
-        "you were gänged up on",
+        "outmanoeuvred by your own twin",
     ],
     rover: [
-        "try giving it more roomba",
-        "exterminate.  exterminate.",
-        "your space was invaded",
-        "the robots have taken over",
-        "defeated by a confused frisbee",
+        "done in by the cleaning contraption",
+        "the automaton ran you down",
+        "mind the mechanical help",
+        "your post was quite overrun",
+        "defeated by an overzealous gadget",
     ],
     ghost: [
-        "you were scared to death",
-        "that wasn't very friendly",
-        "now you're both ghosts",
-        "you were haunted down",
+        "the manor ghost got you",
+        "you were quite spooked",
+        "now you'll haunt the halls together",
+        "the house was always haunted",
         "what did you ex-specter",
     ],
     floor_mimic: [
-        "you never saw that coming",
+        "the floor was not what it seemed",
         "you were absolutely floored",
-        "this seems fu-tile",
-        "watch your step",
-        "you put your foot in its mouth",
+        "a trick of the parquet",
+        "do mind your step",
+        "you put a foot badly wrong",
     ],
 
     // Misc
     dynamite_lit: [
-        "you've got a short fuse",
-        "you failed to put the pin back in",
-        "it had a hair trigger",
-        "no take-backs",
+        "you mishandled the fireworks",
+        "a most short-fused affair",
+        "do set things down gently",
+        "no take-backs, I'm afraid",
         "you ran the wrong way",
     ],
     rolling_ball: [
-        "you were bowled over",
-        "you found some head cannon",
-        "strike one!",
+        "bowled over in the hall",
+        "you dropped the ball, quite literally",
+        "flattened by a runaway sphere",
         "down for the ten-count",
-        "you really dropped the ball",
+        "you really ought to have dodged",
     ],
 };
 // Helper class used to let the game play sounds without knowing too much about the Player
@@ -301,9 +303,9 @@ class SFXPlayer {
         this.player_y = null;
         this.sounds = {};
         this.sound_sources = {
-            // handcrafted
-            blocked1: 'sfx/mmf1.ogg',
-            blocked2: 'sfx/mmf2.ogg',
+            // Butler effort-grunts on bumping into a wall (formant-synthesized "unh")
+            blocked1: 'sfx/grunt1.wav',
+            blocked2: 'sfx/grunt2.wav',
             // https://jummbus.bitbucket.io/#j2N04bombn110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T0v0pL0OD0Ou00q1d1f8y0z2C0w2c0h2T2v0kL0OD0Ou02q1d1f6y1z2C1w1b4gp1b0aCTFucgds0
             bomb: 'sfx/bomb.ogg',
             // https://jummbus.bitbucket.io/#j2N0cbutton-pressn100s0k0l00e00t3Mm1a3g00j07i0r1O_U0o3T0v0pL0OD0Ou00q1d1f3y1z1C2w0c0h0b4p1bJdn51eMUsS0
@@ -482,6 +484,12 @@ class SFXPlayer {
     }
 
     play_once(name, cell = null) {
+        // Cosmetic juice hook — fires for every event regardless of whether sound
+        // is enabled/loaded, so particles/shake/haptics work even when muted.
+        if (this.on_event) {
+            this.on_event(name, cell);
+        }
+
         if (! this.enabled)
             return;
 
@@ -681,7 +689,7 @@ class Player extends PrimaryView {
         };
         this.mobile_pause_menu = mk('div.mobile-pause-menu',
             // waiting
-            btn("Play", {'class': 'button-bright -only-waiting'}, () => {
+            btn("Begin duty", {'class': 'button-bright -only-waiting'}, () => {
                 this.set_state('playing');
             }),
             // paused
@@ -708,7 +716,7 @@ class Player extends PrimaryView {
                         this.conductor.maybe_change_level(this.conductor.level_index - 1);
                     });
                 }),
-                btn("Level select", () => {
+                btn("Duty roster", () => {
                     // TODO this should really be in the level browser itself since you can check
                     // scores without losing a game
                     this.confirm_game_interruption("Abandon this attempt?", () => {
@@ -721,8 +729,8 @@ class Player extends PrimaryView {
                     });
                 }),
             ),
-            btn("Quit to pack list", () => {
-                this.confirm_game_interruption("Abandon this attempt and return to the pack list?", () => {
+            btn("Back to the agenda", () => {
+                this.confirm_game_interruption("Abandon this attempt and return to the agenda?", () => {
                     this.conductor.switch_to_splash();
                 });
             }),
@@ -759,6 +767,8 @@ class Player extends PrimaryView {
         this.pending_player_move = null;
         this.next_player_move = null;
         this.player_used_move = false;
+        this._buffered_dir = null;   // a recently tapped direction awaiting a decision tic
+        this._buffer_ttl = 0;        // tics that buffered direction stays valid
         let key_target = document.body;
         this.current_keycodes = new Set;  // keys that are currently held
         this.current_keycodes_new = new Set; // keys that were pressed since input was last read
@@ -865,6 +875,14 @@ class Player extends PrimaryView {
                 this.current_keycodes_new.add(ev.code);
                 ev.stopPropagation();
                 ev.preventDefault();
+
+                // Buffer a tapped direction so a press made just before the game can
+                // accept it isn't lost (consumed at the next decision tic in get_input).
+                let action = this.keycode_mapping[ev.code];
+                if (DIRECTIONAL_ACTIONS.has(action)) {
+                    this._buffered_dir = action;
+                    this._buffer_ttl = INPUT_BUFFER_TICS;
+                }
 
                 // TODO for demo compat, this should happen as part of input reading?
                 if (this.state === 'waiting') {
@@ -1042,6 +1060,83 @@ class Player extends PrimaryView {
         // TODO yet another thing that should be in setup, but can't be because load_level is called
         // first
         this.sfx_player = new SFXPlayer(this.place_caption.bind(this));
+
+        // Game-feel juice: a particle overlay over the board, driven off sfx events.
+        // Purely cosmetic — never touches the simulation.
+        this.game_area_el = this.root.querySelector('#player-game-area');
+        this.effects = new EffectsLayer(this.game_area_el);
+        this.sfx_player.on_event = (name, cell) => this._juice_event(name, cell);
+    }
+
+    // Translate a game event (from the sfx hook) into cosmetic flourish: particle
+    // bursts at the affected tile, screen shake, and haptics.  Non-deterministic.
+    _juice_event(name, cell) {
+        // Where on screen is the tile?  (client coords; the burst converts to local)
+        let center = null;
+        if (cell && cell.x !== undefined && this.renderer && this.renderer.canvas.isConnected) {
+            let r = this.renderer.get_cell_rect(cell.x, cell.y);
+            center = [r.x + r.width / 2, r.y + r.height / 2];
+        }
+        let burst = (opts) => {
+            if (center) this.effects.burst(center[0], center[1], opts);
+        };
+
+        switch (name) {
+            case 'get-chip':
+            case 'get-chip-extra':
+                burst({ count: 9, colors: ['#e8c46a', '#f4e2a6', '#c8a24a'], rise: 30 });
+                haptic(8);
+                break;
+            case 'get-chip-last':
+                // Last chore done — the door's about to open; a bigger flourish.
+                burst({ count: 18, colors: ['#f4e2a6', '#e8c46a', '#ffffff'], speed: 130, rise: 40 });
+                haptic([12, 20, 12]);
+                break;
+            case 'get-key':
+                burst({ count: 10, colors: ['#c8a24a', '#f4e2a6', '#8fd0e8'], rise: 30 });
+                haptic(8);
+                break;
+            case 'get-tool':
+            case 'get-bonus':
+            case 'get-stopwatch-bonus':
+                burst({ count: 10, colors: ['#a6e3c0', '#f4e2a6', '#e8c46a'], rise: 30 });
+                haptic(10);
+                break;
+            case 'socket':
+                // The front door yields.
+                burst({ count: 20, colors: ['#f4e2a6', '#e8c46a', '#ffffff'], speed: 140, spread: Math.PI * 2, dir: 0, rise: 0, square: true });
+                screen_shake(this.game_area_el, 'sm');
+                haptic([10, 30, 10]);
+                break;
+            case 'exit':
+            case 'win':
+                // Duty complete — a celebratory shower from the doorway.
+                burst({
+                    count: 32, square: true, life: 0.9, gravity: 320, speed: 190,
+                    spread: Math.PI, dir: -Math.PI / 2, rise: 70,
+                    colors: ['#f4e2a6', '#e8c46a', '#c8a24a', '#a6e3c0', '#ffffff'],
+                });
+                haptic([15, 40, 15, 40, 30]);
+                break;
+            case 'bomb':
+                burst({ count: 22, colors: ['#ff8a3d', '#ffd15a', '#e0e0e0'], speed: 170, spread: Math.PI * 2, dir: 0 });
+                screen_shake(this.game_area_el, 'lg');
+                haptic([30, 40, 20]);
+                break;
+            case 'lose':
+                screen_shake(this.game_area_el, 'md');
+                haptic([40, 60, 40]);
+                break;
+            case 'splash':
+            case 'splash-slime':
+                burst({ count: 12, colors: name === 'splash-slime' ? ['#8fd06a', '#b6e08a'] : ['#6ab6e8', '#9fd0f0', '#e0f0ff'], speed: 120, dir: -Math.PI / 2, spread: Math.PI * 0.8, rise: 20 });
+                screen_shake(this.game_area_el, 'sm');
+                haptic(20);
+                break;
+            case 'button-press':
+                haptic(6);
+                break;
+        }
     }
 
     setup() {
@@ -1470,6 +1565,8 @@ class Player extends PrimaryView {
     enter_background() {
         this.stop_restarting();
         this.current_keycodes.clear();
+        this._buffered_dir = null;
+        this._buffer_ttl = 0;
         this.current_touches = {};
 
         if ((this.state === 'playing' || this.state === 'rewinding') && ! this.turn_based_mode) {
@@ -1490,6 +1587,13 @@ class Player extends PrimaryView {
             this.touch_mode = 'swipe';
         }
         this.renderer.use_cc2_anim_speed = options.use_cc2_anim_speed ?? false;
+
+        // Game speed (casual ↔ brisk); clamp to a sane range.
+        this.play_speed = Math.min(2, Math.max(0.5, options.game_speed ?? 1));
+        // Cosmetic-effects toggle (particles/shake); haptics follow the same flag.
+        if (this.effects) {
+            this.effects.enabled = options.effects_enabled ?? true;
+        }
 
         this.music_audio_el.volume = options.music_volume ?? 1.0;
         // TODO hide music info when disabled?
@@ -1804,14 +1908,64 @@ class Player extends PrimaryView {
         }
 
         let input = 0;
-        // Keys
+        // Keys.  Non-directional actions (wait/drop/cycle/swap) OR together as
+        // usual.  Directional keys instead collapse to the single most-recently-
+        // pressed key that's still held, so holding Up then pressing Left moves
+        // left, and releasing Left falls back to Up.  current_keycodes and
+        // current_keycodes_new are Sets, which iterate in insertion (press)
+        // order, so the last directional seen is the newest press.
+        let held_dir = null;  // most recent still-held direction
+        let new_dir = null;   // most recent direction pressed since last read
         for (let keycode of this.current_keycodes) {
-            input |= INPUT_BITS[this.keycode_mapping[keycode]];
+            let action = this.keycode_mapping[keycode];
+            if (DIRECTIONAL_ACTIONS.has(action)) {
+                held_dir = action;
+            }
+            else {
+                input |= INPUT_BITS[action];
+            }
         }
         for (let keycode of this.current_keycodes_new) {
-            input |= INPUT_BITS[this.keycode_mapping[keycode]];
+            let action = this.keycode_mapping[keycode];
+            if (DIRECTIONAL_ACTIONS.has(action)) {
+                new_dir = action;
+            }
+            else {
+                input |= INPUT_BITS[action];
+            }
         }
         this.current_keycodes_new.clear();
+        // A brand-new press this read wins; otherwise the newest still-held one.
+        let active_dir = new_dir ?? held_dir;
+
+        // Input buffering / move leniency: if nothing is held or freshly pressed but
+        // a direction was tapped within the last few tics, hold it until the game can
+        // actually accept a move, then consume it once (so a press made a hair early
+        // still registers, without ever double-moving). Real held input always wins.
+        if (active_dir === null) {
+            if (this._buffer_ttl > 0 && this._buffered_dir !== null &&
+                this.level && this.level.can_accept_input && this.level.can_accept_input())
+            {
+                active_dir = this._buffered_dir;
+                this._buffered_dir = null;
+                this._buffer_ttl = 0;
+            }
+        }
+        else {
+            // A real key is down; drop any stale buffered tap.
+            this._buffered_dir = null;
+            this._buffer_ttl = 0;
+        }
+        if (this._buffer_ttl > 0) {
+            this._buffer_ttl -= 1;
+            if (this._buffer_ttl === 0) {
+                this._buffered_dir = null;
+            }
+        }
+
+        if (active_dir !== null) {
+            input |= INPUT_BITS[active_dir];
+        }
 
         // Touches
         for (let touch of Object.values(this.current_touches)) {
@@ -2294,12 +2448,12 @@ class Player extends PrimaryView {
                 mk('h3', stored_level.author ? `by ${stored_level.author}` : "\u200b"),
                 this.mobile_pause_menu,
                 mk('div.-best-score', best_score),
-                mk('p.-controls-hint.--touch', "tap to start"),
+                mk('p.-controls-hint.--touch', "tap to begin your duty"),
                 mk('p.-controls-hint.--no-touch', "WASD/↑←↓→ to move · space to idle"),
             );
         }
         else if (this.state === 'paused') {
-            overlay.append(mk('h2', "/// paused ///"));
+            overlay.append(mk('h2', "/// at ease ///"));
             overlay.append(this.mobile_pause_menu);
             overlay.append(mk('p.-controls-hint.--touch', "tap to resume"));
             overlay.append(mk('p.-controls-hint.--no-touch', "press space to resume"));
@@ -2312,7 +2466,7 @@ class Player extends PrimaryView {
                 overlay.setAttribute('data-reason', 'failure');
                 let obits = OBITUARIES[this.level.fail_reason] ?? OBITUARIES['generic'];
                 overlay.append(
-                    mk('h2', "whoops" + random_choice(["", "!", "?", "..."])),
+                    mk('h2', "dear me" + random_choice(["", "!", "?", "...", ","])),
                     mk('h3', random_choice(obits)),
                     this.mobile_pause_menu,
                     mk('p.-controls-hint.--touch', "tap to try again, or use undo/rewind above"),
@@ -2374,6 +2528,7 @@ class Player extends PrimaryView {
                     savefile.total_levels = this.conductor.stored_game.level_metadata.length;
                     savefile.scorecards[level_index] = new_scorecard;
                     this.conductor.save_savefile();
+                    if (window.Arcade) { Arcade.report('score', savefile.total_score||0); Arcade.report('aidless', savefile.aidless_levels||0); }
                 }
 
                 overlay.setAttribute('data-reason', 'success');
@@ -2389,29 +2544,29 @@ class Player extends PrimaryView {
                 let quip;
                 if (this.level.chips_remaining > 0) {
                     quip = random_choice([
-                        "socket to em!", "go bug blaster!",
+                        "the door yields!", "duty discharged!",
                     ]);
                 }
                 else if (this.level.time_remaining && this.level.time_remaining < 200) {
                     quip = random_choice([
-                        "in the nick of time!", "cutting it close!",
+                        "in the nick of time, sir!", "cutting it rather close!",
                     ]);
                 }
                 else if (time_left_fraction !== null && time_left_fraction > 1) {
                     quip = random_choice([
-                        "faster than light!", "impossible speed!", "pipelined!",
+                        "impeccably swift!", "with time to spare!", "most punctual!",
                     ]);
                 }
                 else if (time_left_fraction !== null && time_left_fraction > 0.75) {
                     quip = random_choice([
-                        "lightning quick!", "nice speedrun!", "eagerly evaluated!",
+                        "briskly done!", "most efficient!", "smartly handled!",
                     ]);
                 }
                 else {
                     quip = random_choice([
-                        "you did it!", "nice going!", "great job!", "good work!",
-                        "onwards!", "tubular!", "yeehaw!", "hot damn!",
-                        "alphanumeric!", "nice dynamic typing!",
+                        "very good, sir.", "duty discharged.", "impeccably done.",
+                        "at your service.", "consider it handled.", "a job well done.",
+                        "the Master will be pleased.", "onwards!",
                     ]);
                 }
                 overlay.append(mk('h2', quip));
@@ -2739,43 +2894,43 @@ const BUILTIN_PACKS = [{
     path: 'levels/CC2LP1.zip',
     preview: 'levels/previews/cc2lp1.png',
     ident: 'Chips Challenge 2 Level Pack 1',
-    title: "Chip's Challenge 2 Level Pack 1",
-    desc: "A demanding guest ledger of duties, dense and tricky. New to service? Do Jarvis's Orientation first.",
+    title: "Jarvis's Junction — Advanced Duties",
+    desc: "Dense, tricky duties for a seasoned butler. New to service? Do Jarvis's Orientation first. Inspired by the Chip's Challenge 2 level pack.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_2_Level_Pack_1',
 }, {
     path: 'levels/CCLP1.ccl',
     preview: 'levels/previews/cclp1.png',
     ident: 'cclp1',
-    title: "Chip's Challenge Level Pack 1",
-    desc: "A pack for new players, like a parallel universe replacement for Chip's Challenge 1.  Great place to start.",
+    title: "Jarvis's Junction — Level Pack 1",
+    desc: "A gentle start for new staff — a great place to begin. Inspired by the Chip's Challenge level pack.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1',
 }, {
     path: 'levels/CCLXP2.ccl',
     preview: 'levels/previews/cclxp2.png',
     ident: 'cclxp2',
-    title: "Chip's Challenge Level Pack 2-X",
-    desc: "The first community level pack.  Chaotic, messy, sometimes unfair.",
+    title: "Jarvis's Junction — Level Pack 2",
+    desc: "Chaotic, messy, sometimes unfair. Inspired by the Chip's Challenge level pack.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_2_(Lynx)',
 }, {
     path: 'levels/CCLP3.ccl',
     preview: 'levels/previews/cclp3.png',
     ident: 'cclp3',
-    title: "Chip's Challenge Level Pack 3",
-    desc: "A tough challenge, by and for veteran players.",
+    title: "Jarvis's Junction — Level Pack 3",
+    desc: "A tough shift, by and for veteran staff. Inspired by the Chip's Challenge level pack.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_3',
 }, {
     path: 'levels/CCLP4.ccl',
     preview: 'levels/previews/cclp4.png',
     ident: 'cclp4',
-    title: "Chip's Challenge Level Pack 4",
-    desc: "A moderate challenge.  Good next step after CCLP1.",
+    title: "Jarvis's Junction — Level Pack 4",
+    desc: "A moderate challenge — a good next step. Inspired by the Chip's Challenge level pack.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_4',
 }, {
     path: 'levels/CCLP5.ccl',
     preview: 'levels/previews/cclp5.png',
     ident: 'cclp5',
-    title: "Chip's Challenge Level Pack 5",
-    desc: "The latest and greatest, and among the hardest.",
+    title: "Jarvis's Junction — Level Pack 5",
+    desc: "The latest and greatest, and among the hardest. Inspired by the Chip's Challenge level pack.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_5',
 }];
 const BUILTIN_PACKS_BY_IDENT = {
@@ -2973,7 +3128,7 @@ class Splash extends PrimaryView {
         let button = mk('button.button-big.button-bright', {type: 'button'}, title);
         if (packdef) {
             button.addEventListener('click', ev => {
-                this.conductor.fetch_pack(packdef.path, packdef.title, packdef.ident);
+                this.conductor.fetch_pack(packdef.path, packdef.title, packdef.ident, true);
             });
         }
         else {
@@ -3075,7 +3230,7 @@ class Splash extends PrimaryView {
     }
 
     // Look for something we can load, and load it
-    async search_multi_source(source) {
+    async search_multi_source(source, title = null, override_title = false) {
         let paths;
         if (Array.fromAsync) {
             paths = await Array.fromAsync(source.iter_all_files());
@@ -3098,7 +3253,7 @@ class Splash extends PrimaryView {
             // TODO this can't load an individual c2m, hmmm
             if (ext === 'c2g' || ext === 'dat' || ext === 'ccl') {
                 let buf = await source.get(path);
-                await this.conductor.parse_and_load_game(buf, source, path);
+                await this.conductor.parse_and_load_game(buf, source, path, null, title, override_title);
                 break;
             }
         }
@@ -3112,8 +3267,17 @@ class Splash extends PrimaryView {
 
 const BUILTIN_TILESETS = {
     lexy: {
-        name: "Lexy's Labyrinth",
+        name: "Jarvis's Junction",
         src: 'tileset-lexy.png',
+        layout: 'lexy',
+        tile_width: 32,
+        tile_height: 32,
+    },
+    // eevee's original Lexy's Labyrinth art (CC BY-SA 4.0), bundled as reference-lexy.png.
+    // Offered as a selectable skin so there's a known-good standard to test against.
+    'lexy-original': {
+        name: "Lexy (original)",
+        src: 'reference-lexy.png',
         layout: 'lexy',
         tile_width: 32,
         tile_height: 32,
@@ -3212,7 +3376,24 @@ const TILESET_SLOTS = [{
     name: "LL",
 }];
 const CUSTOM_TILESET_BUCKETS = ['Custom 1', 'Custom 2', 'Custom 3'];
+// The in-app tile editor stores its edits under this dedicated bucket (kept out of
+// CUSTOM_TILESET_BUCKETS so uploads never clobber it, and never garbage-collected on Save).
+const EDITOR_TILESET_BUCKET = 'Editor';
 const CUSTOM_TILESET_PREFIX = "Lexy's Labyrinth custom tileset: ";
+
+// Every user (non-built-in) tileset is persisted at CUSTOM_TILESET_PREFIX + <name>, where
+// the name is both its display name and its ident.  Enumerate them straight from storage so
+// they always reappear — no fixed bucket list to run out of or silently overwrite.
+function stored_tileset_names() {
+    let names = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+        let k = window.localStorage.key(i);
+        if (k && k.startsWith(CUSTOM_TILESET_PREFIX)) {
+            names.push(k.slice(CUSTOM_TILESET_PREFIX.length));
+        }
+    }
+    return names;
+}
 class OptionsOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
@@ -3238,6 +3419,14 @@ class OptionsOverlay extends DialogOverlay {
             ),
             mk('dt'),
             mk('dd', mk('label', mk('input', {name: 'use-cc2-anim-speed', type: 'checkbox'}), " Use CC2 animation speed")),
+            mk('h2', "Gameplay"),
+            mk('dt', "Game speed"),
+            mk('dd.option-speed',
+                mk('input', {name: 'game-speed', type: 'range', min: 0.5, max: 2, step: 0.25}),
+                this._speed_label = mk('output', "1×"),
+            ),
+            mk('dt'),
+            mk('dd', mk('label', mk('input', {name: 'effects-enabled', type: 'checkbox'}), " Visual effects (particles & shake)")),
             mk('h2', "Audio"),
             mk('dt', "Music volume"),
             mk('dd.option-volume',
@@ -3311,18 +3500,34 @@ class OptionsOverlay extends DialogOverlay {
                 newdef.tileset = new Tileset(
                     img, TILESET_LAYOUTS[newdef.layout ?? 'lexy'],
                     newdef.tile_width, newdef.tile_height);
+                // Register it so fallbacks and comparisons resolve consistently, and redraw
+                // its row's preview once the image decodes (it isn't ready synchronously).
+                conductor._loaded_tilesets[ident] = newdef.tileset;
+                img.addEventListener('load', () => this._redraw_tileset_previews(ident));
             }
             this.available_tilesets[ident] = newdef;
         }
-        for (let bucket of CUSTOM_TILESET_BUCKETS) {
-            if (conductor._loaded_tilesets[bucket]) {
-                this.available_tilesets[bucket] = {
-                    ident: bucket,
-                    name: bucket,
-                    is_already_stored: true,
-                    tileset: conductor._loaded_tilesets[bucket],
-                };
-            }
+        this._preview_tds = {};
+        // Every user tileset ever saved, straight from storage — so nothing gets lost.
+        for (let name of stored_tileset_names()) {
+            if (this.available_tilesets[name]) continue;
+            let stored = load_json_from_storage(CUSTOM_TILESET_PREFIX + name);
+            if (! stored) continue;
+            let tileset = conductor._loaded_tilesets[name] ?? this._make_tileset({ ...stored, ident: name });
+            this.available_tilesets[name] = {
+                ident: name,
+                name: stored.name || name,
+                is_user: true,
+                is_already_stored: true,
+                tileset,
+            };
+        }
+        // Any in-memory tileset not yet written to storage (e.g. just uploaded/edited).
+        for (let [ident, tileset] of Object.entries(conductor._loaded_tilesets)) {
+            if (this.available_tilesets[ident] || BUILTIN_TILESETS[ident]) continue;
+            this.available_tilesets[ident] = {
+                ident, name: ident, is_user: true, is_already_stored: true, tileset,
+            };
         }
 
         let thead = mk('tr', mk('th', "Preview"), mk('th', "Format"));
@@ -3331,18 +3536,51 @@ class OptionsOverlay extends DialogOverlay {
         for (let slot of TILESET_SLOTS) {
             thead.append(mk('th.-slot', slot.name));
         }
+        thead.append(mk('th', "Manage"));
         for (let [ident, def] of Object.entries(this.available_tilesets)) {
             this._add_tileset_row(ident, def);
         }
+
+        // Quick in-game skin selector: switch the active tileset instantly, for all
+        // formats at once. (The table below still allows per-format control + Save.)
+        this.active_skin_select = mk('select.-active-skin');
+        this._populate_active_skin_select();
+        this.active_skin_select.addEventListener('change',
+            () => this._select_active_skin(this.active_skin_select.value));
+        this.tileset_table.before(mk('p.-active-skin-row',
+            mk('label', mk('b', "Active skin: "), this.active_skin_select),
+            " — switches instantly; fine-tune per format in the table below, then Save."));
+
         this.custom_tileset_counter = 1;
         // FIXME allow drag-drop into...  this window?  area?  idk
         let custom_tileset_button = mk('button', {type: 'button'}, "Load custom tileset");
         custom_tileset_button.addEventListener('click', () => this.root.elements['custom-tileset'].click());
+        let dl_tileset_button = mk('button', {type: 'button'}, "⤓ Download tileset");
+        dl_tileset_button.addEventListener('click', () => this._download_tileset());
+        let dl_guide_button = mk('button', {type: 'button'}, "⤓ Download numbered guide");
+        dl_guide_button.addEventListener('click', () => this._download_guide());
+        let legend_button = mk('button', {type: 'button'}, "View legend");
+        legend_button.addEventListener('click', () => this._view_legend());
+        let edit_button = mk('button.button-bright', {type: 'button'}, "✎ Edit tiles in-app");
+        edit_button.addEventListener('click', () => {
+            // Continue editing whatever skin is currently active (so applied edits aren't
+            // lost); the editor itself lets you switch which tileset you're painting.
+            let active = this.conductor.options.tilesets['ll'];
+            let initial = this.available_tilesets[active] ? active : 'lexy';
+            new TileEditorOverlay(this.conductor, this.available_tilesets, initial, this).open();
+        });
         this.main.append(
+            mk('p.-reskin-intro',
+                "Reskin the game. ", mk('b', "Duplicate"), " a tileset in the table above to make your own named copy, then ",
+                mk('b', "Edit"), " it — or paint the active skin here, ", mk('b', "download"),
+                " the sheet to edit elsewhere, and ", mk('b', "load"), " it back."),
+            mk('p', edit_button),
+            mk('p', dl_tileset_button, " ", dl_guide_button, " ", legend_button,
+                " — the sheet, an overlay numbering every cell, and a legend saying what each number is."),
             mk('p',
                 mk('input', {type: 'file', name: 'custom-tileset'}),
                 custom_tileset_button,
-                " — Any format: MSCC, Tile World, or Steam.",
+                " — an edited sheet (or any MSCC / Tile World / Steam tileset). Pick it in the table above, then Save.",
             ),
             mk('p', "(Steam CC tilesets are in the game files under ", mk('code', "data/bmp"), ".)"),
             mk('div.option-load-tileset'),
@@ -3351,9 +3589,32 @@ class OptionsOverlay extends DialogOverlay {
             this._load_custom_tileset(ev.target.files[0]);
         });
 
+        // Credits / attribution (kept off the front page, surfaced here instead)
+        this.main.append(
+            mk('h2', "About"),
+            mk('p.-about',
+                "Jarvis's Junction is inspired by ",
+                mk('a', {href: 'https://github.com/eevee/lexys-labyrinth', target: '_blank'}, "Lexy's Labyrinth"),
+                " by eevee — an open-source, Chip's Challenge–compatible engine (MIT), with original art & music under CC BY-SA 4.0."),
+        );
+
         // Load current values
         this.root.elements['touch-mode'].value = this.conductor.options.touch_mode ?? 'swipe';
         this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
+        this.root.elements['game-speed'].value = this.conductor.options.game_speed ?? 1;
+        this.root.elements['effects-enabled'].checked = this.conductor.options.effects_enabled ?? true;
+        // Live-update the speed label, and preview the speed if a game is in progress
+        let update_speed_label = () => {
+            let v = parseFloat(this.root.elements['game-speed'].value);
+            this._speed_label.textContent = `${v}×`;
+        };
+        update_speed_label();
+        this.root.elements['game-speed'].addEventListener('input', ev => {
+            update_speed_label();
+            if (this.conductor.current === player) {
+                player.play_speed = parseFloat(ev.target.value);
+            }
+        });
         this.root.elements['music-volume'].value = this.conductor.options.music_volume ?? 1.0;
         this.root.elements['music-enabled'].checked = this.conductor.options.music_enabled ?? true;
         this.root.elements['sound-volume'].value = this.conductor.options.sound_volume ?? 1.0;
@@ -3412,17 +3673,16 @@ class OptionsOverlay extends DialogOverlay {
     }
 
     _add_tileset_row(ident, def) {
-        let tr = mk('tr');
+        let tr = mk('tr', {'data-tileset': ident});
         this.tileset_table.append(tr);
 
-        tr.append(mk('td',
-            // TODO maybe draw these all to a single canvas
-            CanvasRenderer.draw_single_tile(def.tileset, 'player'),
-            CanvasRenderer.draw_single_tile(def.tileset, 'chip'),
-            CanvasRenderer.draw_single_tile(def.tileset, 'exit'),
-        ));
+        let preview = mk('td.-preview');
+        this._preview_tds[ident] = preview;
+        tr.append(preview);
+        this._redraw_tileset_previews(ident);
 
         tr.append(mk('td.-format',
+            mk('div.-tileset-name', def.name || ident),
             def.tileset.layout['#name'],
             mk('br'),
             `${def.tileset.size_x}×${def.tileset.size_y}px`,
@@ -3440,33 +3700,395 @@ class OptionsOverlay extends DialogOverlay {
             }
         }
 
-        // FIXME make buttons work
-        return;
+        // Contextual actions: everything can be duplicated; user tilesets can also be
+        // edited, renamed, and deleted.  Built-ins are read-only templates.
+        let wrap = mk('div.-actions-wrap');
+        tr.append(mk('td.-tileset-actions', wrap));
+        let dup = mk('button', {type: 'button', title: 'Duplicate this tileset under a new name'}, "⧉ Duplicate");
+        dup.addEventListener('click', () => this._duplicate_tileset(ident));
+        wrap.append(dup);
+        if (def.is_user) {
+            let edit = mk('button', {type: 'button'}, "✎ Edit");
+            edit.addEventListener('click', () => this._edit_tileset(ident));
+            let rename = mk('button', {type: 'button'}, "Rename");
+            rename.addEventListener('click', () => this._rename_tileset(ident));
+            let del = mk('button.-danger', {type: 'button'}, "Delete");
+            del.addEventListener('click', () => this._delete_tileset(ident));
+            wrap.append(edit, rename, del);
+        }
+    }
 
-        if (def.is_builtin) {
-            tr.append(mk('td'));
+    _redraw_tileset_previews(ident) {
+        let td = this._preview_tds[ident];
+        let def = this.available_tilesets[ident];
+        if (! td || ! def) return;
+        td.textContent = '';
+        td.append(
+            CanvasRenderer.draw_single_tile(def.tileset, 'player'),
+            CanvasRenderer.draw_single_tile(def.tileset, 'chip'),
+            CanvasRenderer.draw_single_tile(def.tileset, 'exit'),
+        );
+    }
+
+    // Build a Tileset from a stored def (data-URI image); redraws its previews once decoded.
+    _make_tileset(def) {
+        let ident = def.ident ?? def.name;
+        let img = new Image;
+        let layout = TILESET_LAYOUTS[def.layout] ?? TILESET_LAYOUTS['lexy'];
+        let tileset = new Tileset(img, layout, def.tile_width ?? 32, def.tile_height ?? 32);
+        img.addEventListener('load', () => this._redraw_tileset_previews(ident));
+        img.src = def.src;
+        this.conductor._loaded_tilesets[ident] = tileset;
+        return tileset;
+    }
+
+    _unique_tileset_name(base) {
+        let taken = name => BUILTIN_TILESETS[name] || this.available_tilesets[name]
+            || stored_tileset_names().includes(name);
+        if (! taken(base)) return base;
+        for (let i = 2; ; i++) {
+            let cand = `${base} ${i}`;
+            if (! taken(cand)) return cand;
+        }
+    }
+
+    // Copy a tileset into a new, independently-stored, editable one (prompts for a name).
+    _duplicate_tileset(ident) {
+        let def = this.available_tilesets[ident];
+        if (! def) return;
+        let suggestion = this._unique_tileset_name(`${def.name || ident} copy`);
+        let name = window.prompt("Name for the new tileset:", suggestion);
+        if (name === null) return;
+        name = name.trim();
+        if (! name) return;
+        if (BUILTIN_TILESETS[name] || this.available_tilesets[name] || stored_tileset_names().includes(name)) {
+            window.alert(`A tileset named "${name}" already exists — pick a different name.`);
+            return;
+        }
+        let src = def.tileset, img = src.image;
+        let canvas = mk('canvas', {width: img.naturalWidth || img.width, height: img.naturalHeight || img.height});
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        let tileset = new Tileset(canvas, src.layout, src.size_x, src.size_y);
+        // Carry over the source's saved palette, if it has one.
+        let src_rec = def.is_user ? load_json_from_storage(CUSTOM_TILESET_PREFIX + ident) : null;
+        try {
+            save_json_to_storage(CUSTOM_TILESET_PREFIX + name, {
+                ident: name, name, layout: src.layout['#ident'],
+                tile_width: src.size_x, tile_height: src.size_y, src: canvas.toDataURL('image/png'),
+                ...(src_rec && src_rec.palette ? { palette: src_rec.palette } : {}),
+            });
+        }
+        catch (err) {
+            console.error(err);
+            window.alert("Couldn't save the new tileset — browser storage may be full.");
+            return;
+        }
+        this.conductor._loaded_tilesets[name] = tileset;
+        this.available_tilesets[name] = { ident: name, name, is_user: true, is_already_stored: true, tileset };
+        this._add_tileset_row(name, this.available_tilesets[name]);
+        this._populate_active_skin_select();
+        this.active_skin_select.value = name;
+        return name;
+    }
+
+    _rename_tileset(ident) {
+        let def = this.available_tilesets[ident];
+        if (! def || ! def.is_user) return;
+        let name = window.prompt("New name for this tileset:", def.name || ident);
+        if (name === null) return;
+        name = name.trim();
+        if (! name || name === ident) return;
+        if (BUILTIN_TILESETS[name] || this.available_tilesets[name] || stored_tileset_names().includes(name)) {
+            window.alert(`A tileset named "${name}" already exists — pick a different name.`);
+            return;
+        }
+        let stored = load_json_from_storage(CUSTOM_TILESET_PREFIX + ident) || {};
+        stored.ident = name; stored.name = name;
+        try { save_json_to_storage(CUSTOM_TILESET_PREFIX + name, stored); }
+        catch (err) { console.error(err); window.alert("Couldn't rename — storage may be full."); return; }
+        window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + ident);
+        // Move it over in memory and re-point any slots that used the old ident.
+        this.conductor._loaded_tilesets[name] = this.conductor._loaded_tilesets[ident];
+        delete this.conductor._loaded_tilesets[ident];
+        this.available_tilesets[name] = { ...def, ident: name, name };
+        delete this.available_tilesets[ident];
+        for (let slot of TILESET_SLOTS) {
+            if (this.conductor.options.tilesets[slot.ident] === ident) {
+                this.conductor.options.tilesets[slot.ident] = name;
+            }
+        }
+        this.conductor.save_stash();
+        this._rebuild_tileset_table();
+    }
+
+    _delete_tileset(ident) {
+        let def = this.available_tilesets[ident];
+        if (! def || ! def.is_user) return;
+        if (! window.confirm(`Delete the tileset "${def.name || ident}"? This can't be undone.`)) return;
+        window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + ident);
+        delete this.conductor._loaded_tilesets[ident];
+        delete this.available_tilesets[ident];
+        // Any slot pointing at it falls back to the built-in default.
+        for (let slot of TILESET_SLOTS) {
+            if (this.conductor.options.tilesets[slot.ident] === ident) {
+                this.conductor.options.tilesets[slot.ident] = 'lexy';
+                this.conductor.tilesets[slot.ident] = this.available_tilesets['lexy'].tileset;
+            }
+        }
+        this.conductor.save_stash();
+        this._apply_tilesets_live();
+        this._rebuild_tileset_table();
+    }
+
+    _edit_tileset(ident) {
+        if (! this.available_tilesets[ident]) return;
+        new TileEditorOverlay(this.conductor, this.available_tilesets, ident, this).open();
+    }
+
+    // Re-render the whole table + selectors from available_tilesets (after add/rename/delete).
+    _rebuild_tileset_table() {
+        for (let tr of [...this.tileset_table.querySelectorAll('tr[data-tileset]')]) tr.remove();
+        this._preview_tds = {};
+        for (let [id, def] of Object.entries(this.available_tilesets)) {
+            this._add_tileset_row(id, def);
+        }
+        // Re-check radios to match the saved slots.
+        for (let slot of TILESET_SLOTS) {
+            let value = this.conductor.options.tilesets[slot.ident] ?? 'lexy';
+            let radio = this.tileset_table.querySelector(
+                `input[name="tileset-${slot.ident}"][value="${CSS.escape(value)}"]`);
+            if (radio) radio.checked = true;
+        }
+        this._populate_active_skin_select();
+    }
+
+    // Called by the tile editor after it applies edits to a user tileset: make sure that
+    // tileset is a real, selected row so a later Save preserves it instead of reverting
+    // every slot to whatever radio was checked when the dialog opened.
+    _register_user_tileset(ident, tileset, name = ident) {
+        let def = this.available_tilesets[ident];
+        if (! def) {
+            def = this.available_tilesets[ident] = {
+                ident, name, is_user: true, is_already_stored: true, tileset,
+            };
         }
         else {
-            // TODO this doesn't do anything yet.  currently we just delete any tilesets not
-            // assigned to a slot
-            tr.append(mk('td', mk('button', {type: 'button'}, "Forget")));
+            def.tileset = tileset;
         }
+        if (! this.tileset_table.querySelector(
+                `input[name="tileset-ll"][value="${CSS.escape(ident)}"]`)) {
+            this._add_tileset_row(ident, def);
+        }
+        else {
+            this._redraw_tileset_previews(ident);
+        }
+        for (let slot of TILESET_SLOTS) {
+            let radio = this.tileset_table.querySelector(
+                `input[name="tileset-${slot.ident}"][value="${CSS.escape(ident)}"]`);
+            if (radio) radio.checked = true;
+        }
+        this._populate_active_skin_select();
+        this.active_skin_select.value = ident;
+    }
 
-        tr.append(mk('td',
-            make_button("LL", () => {
-                convert_tileset_to_layout(def.tileset, 'lexy');
-            }),
-            make_button("CC2", () => {
-                let canvas = convert_tileset_to_layout(def.tileset, 'cc2');
-                mk('a', {href: canvas.toDataURL(), target: '_new'}).click();
-            }),
-            make_button("MSCC", () => {
-                convert_tileset_to_layout(def.tileset, 'tw-static');
-            }),
-            make_button("TW", () => {
-                convert_tileset_to_layout(def.tileset, 'tw-animated');
-            }),
-        ));
+    // ---- Quick "active skin" selector (live, drives all slots) -------------
+    _populate_active_skin_select() {
+        let sel = this.active_skin_select;
+        sel.textContent = '';
+        let active = this.conductor.options.tilesets['ll'] ?? 'lexy';
+        for (let [ident, def] of Object.entries(this.available_tilesets)) {
+            if (! def.tileset.layout['#supported-versions'].has('ll')) continue;
+            let opt = mk('option', {value: ident}, def.name || ident);
+            if (ident === active) opt.selected = true;
+            sel.append(opt);
+        }
+    }
+    _select_active_skin(ident) {
+        let def = this.available_tilesets[ident];
+        if (! def) return;
+        // Built-in and already-stored sets can be persisted right away; a freshly-uploaded
+        // one has no storage bucket yet, so just preview it live and let Save file it away.
+        let persist = def.is_builtin || def.is_already_stored;
+        for (let slot of TILESET_SLOTS) {
+            if (! def.tileset.layout['#supported-versions'].has(slot.ident)) continue;
+            // Tick the matching table radio so the table + a later Save agree…
+            let radio = this.tileset_table.querySelector(
+                `input[name="tileset-${slot.ident}"][value="${CSS.escape(ident)}"]`);
+            if (radio) radio.checked = true;
+            // …and swap it in live so the change is visible immediately.
+            this.conductor.tilesets[slot.ident] = def.tileset;
+            this.conductor._loaded_tilesets[ident] = def.tileset;
+            if (persist) this.conductor.options.tilesets[slot.ident] = ident;
+        }
+        if (persist) this.conductor.save_stash();
+        this._apply_tilesets_live();
+    }
+    _apply_tilesets_live() {
+        let p = this.conductor.player;
+        if (p) {
+            p._loaded_tileset = false;
+            if (p.level) { p.update_tileset(); if (p._redraw) p._redraw(); }
+        }
+        let ed = this.conductor.editor;
+        if (ed) ed._loaded_tileset = false;
+    }
+
+    // ---- Reskin: export the current tileset + a labelled guide -------------
+    _reskin_source() {
+        // The base "Jarvis" tileset if present, else whatever's first.
+        let def = this.available_tilesets['lexy'] ?? Object.values(this.available_tilesets)[0];
+        return def && def.tileset;
+    }
+
+    _download_blob(blob, filename) {
+        let url = URL.createObjectURL(blob);
+        let a = mk('a', {href: url, download: filename});
+        document.body.append(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    _download_tileset() {
+        let ts = this._reskin_source();
+        if (! ts) return;
+        let img = ts.image;
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        let canvas = mk('canvas', {width: w, height: h});
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.toBlob(blob => this._download_blob(blob, "jarvis-junction-tileset.png"));
+    }
+
+    // Walk a tileset layout into an ordered, numbered list of every cell, with a
+    // human label derived from the path to it (state / direction / frame). e.g.
+    // { n: 2, c: 17, r: 0, tile: 'player', label: 'moving · north · #2' }.
+    _cell_labels() {
+        let ts = this._reskin_source();
+        if (! ts) return [];
+        let img = ts.image;
+        let cols = Math.round((img.naturalWidth || img.width) / ts.size_x);
+        let rows = Math.round((img.naturalHeight || img.height) / ts.size_y);
+        const SKIP = new Set(['__special__', 'modes', 'is_wired_optional', 'duration',
+            'cc2_duration', 'positionally_hashed', 'scroll_region', '_distinct', 'global']);
+        const WRAP = new Set(['all', 'normal']);  // structural keys not worth showing
+        let claimed = {};
+        let walk = (tile, node, path) => {
+            if (Array.isArray(node)) {
+                if (node.length === 2 && Number.isInteger(node[0]) && Number.isInteger(node[1])
+                    && node[0] < cols && node[1] < rows)
+                {
+                    let key = node[0] + ',' + node[1];
+                    if (! (key in claimed)) claimed[key] = { tile, label: path.join(' · ') };
+                    return;
+                }
+                node.forEach((e, i) => walk(tile, e, path.concat('#' + (i + 1))));
+                return;
+            }
+            if (node && typeof node === 'object') {
+                for (let [k, v] of Object.entries(node)) {
+                    if (k[0] === '#' || SKIP.has(k)) continue;
+                    walk(tile, v, WRAP.has(k) ? path : path.concat(k));
+                }
+            }
+        };
+        for (let [name, v] of Object.entries(ts.layout)) {
+            if (name[0] !== '#') walk(name, v, []);
+        }
+        let cells = Object.entries(claimed).map(([k, info]) => {
+            let [c, r] = k.split(',').map(Number);
+            return { c, r, tile: info.tile, label: info.label };
+        });
+        cells.sort((a, b) => a.r - b.r || a.c - b.c);
+        cells.forEach((cell, i) => cell.n = i + 1);
+        return cells;
+    }
+
+    // A transparent overlay with each cell's NUMBER — lay it over the downloaded
+    // tileset while you paint, and look the number up in the legend.
+    _download_guide() {
+        let ts = this._reskin_source();
+        if (! ts) return;
+        let img = ts.image;
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        let sx = ts.size_x, sy = ts.size_y;
+        let cols = Math.round(w / sx), rows = Math.round(h / sy);
+        let canvas = mk('canvas', {width: w, height: h});
+        let ctx = canvas.getContext('2d');
+        ctx.strokeStyle = 'rgba(30,24,20,0.4)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= cols; i++) { ctx.beginPath(); ctx.moveTo(i*sx + 0.5, 0); ctx.lineTo(i*sx + 0.5, h); ctx.stroke(); }
+        for (let j = 0; j <= rows; j++) { ctx.beginPath(); ctx.moveTo(0, j*sy + 0.5); ctx.lineTo(w, j*sy + 0.5); ctx.stroke(); }
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let cell of this._cell_labels()) {
+            let cx = cell.c*sx + sx/2, cy = cell.r*sy + sy/2;
+            ctx.fillStyle = 'rgba(20,16,12,0.78)';
+            ctx.fillRect(cell.c*sx + 1, cy - 6, sx - 2, 12);
+            ctx.fillStyle = '#ffe6b0';
+            ctx.fillText(String(cell.n), cx, cy);
+        }
+        canvas.toBlob(blob => this._download_blob(blob, "jarvis-junction-guide.png"));
+    }
+
+    // Open a printable legend page: number -> thumbnail of that exact cell ->
+    // what it is (tile + state/direction/frame) -> what the tile does.
+    async _view_legend() {
+        let ts = this._reskin_source();
+        if (! ts) return;
+        let cells = this._cell_labels();
+        // per-tile descriptions (best effort; the page still works without them)
+        let descs = {};
+        try { descs = await (await fetch('tileset-src/tile-descriptions.json')).json(); }
+        catch (e) { descs = {}; }
+
+        let img = ts.image, sx = ts.size_x, sy = ts.size_y, TH = 3;  // 3x thumbnails
+        let tc = mk('canvas', {width: sx*TH, height: sy*TH});
+        let tctx = tc.getContext('2d');
+        tctx.imageSmoothingEnabled = false;
+
+        let rows_html = cells.map(cell => {
+            tctx.clearRect(0, 0, tc.width, tc.height);
+            tctx.drawImage(img, cell.c*sx, cell.r*sy, sx, sy, 0, 0, sx*TH, sy*TH);
+            let thumb = tc.toDataURL();
+            let what = cell.tile + (cell.label ? ' — ' + cell.label : '');
+            let desc = descs[cell.tile] || '';
+            return `<tr><td class="n">${cell.n}</td>`
+                + `<td><img src="${thumb}" width="${sx*TH}" height="${sy*TH}"></td>`
+                + `<td class="rc">${cell.c},${cell.r}</td>`
+                + `<td class="what">${what}</td>`
+                + `<td class="desc">${desc}</td></tr>`;
+        }).join('');
+
+        let html = `<!doctype html><meta charset=utf8><title>Jarvis's Junction — tile legend</title>
+<style>
+  body{font:14px/1.5 system-ui,sans-serif;background:#f4eee2;color:#33261a;margin:0;padding:24px}
+  h1{font:600 26px Georgia,serif;margin:0 0 4px}
+  p{color:#6b5c49;margin:0 0 16px;max-width:70ch}
+  input{font:14px monospace;padding:8px 12px;border:1px solid #d9ccb4;border-radius:8px;width:260px;margin-bottom:16px}
+  table{border-collapse:collapse;width:100%}
+  td,th{padding:6px 10px;border-bottom:1px solid #e6dcc9;vertical-align:middle;text-align:left}
+  th{position:sticky;top:0;background:#f4eee2;font:600 12px system-ui;text-transform:uppercase;letter-spacing:.05em;color:#8c7d69}
+  td.n{font:600 15px monospace;color:#ad6543;font-variant-numeric:tabular-nums}
+  td.rc{font:12px monospace;color:#b6a891}
+  td.what{font:13px monospace}
+  td.desc{color:#5c4e3e}
+  img{image-rendering:pixelated;border:1px solid #d9ccb4;background:#fff;display:block}
+</style>
+<h1>Tile legend — Jarvis's Junction</h1>
+<p>Every cell of the tileset, numbered top-to-bottom. The number matches the guide overlay
+(⤓ download guide). Paint the sprite shown into that cell. <b>${cells.length}</b> cells total.</p>
+<input id="q" placeholder="filter… e.g. player, ice, walking">
+<table><thead><tr><th>#</th><th>tile</th><th>col,row</th><th>what it is</th><th>what it does</th></tr></thead>
+<tbody id="b">${rows_html}</tbody></table>
+<script>
+  const q=document.getElementById('q'), rows=[...document.querySelectorAll('#b tr')];
+  q.addEventListener('input',()=>{const t=q.value.toLowerCase();for(const r of rows){r.style.display=r.textContent.toLowerCase().includes(t)?'':'none';}});
+</script>`;
+        let blob = new Blob([html], { type: 'text/html' });
+        let url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
 
     async _load_custom_tileset(file) {
@@ -3500,16 +4122,32 @@ class OptionsOverlay extends DialogOverlay {
         let tilesetdef = {
             ident: tileset_ident,
             name: tileset_name,
+            is_user: true,
             canvas: tileset.image,
             tileset: tileset,
             layout: tileset.layout['#ident'],
             tile_width: tileset.size_x,
             tile_height: tileset.size_y,
         };
+        // Persist immediately so it's a full, manageable user tileset right away (not just
+        // when you happen to assign it to a slot and Save).
+        try {
+            save_json_to_storage(CUSTOM_TILESET_PREFIX + tileset_ident, {
+                ident: tileset_ident, name: tileset_name, layout: tilesetdef.layout,
+                tile_width: tilesetdef.tile_width, tile_height: tilesetdef.tile_height,
+                src: tileset.image.toDataURL('image/png'),
+            });
+            tilesetdef.is_already_stored = true;
+            this.conductor._loaded_tilesets[tileset_ident] = tileset;
+        }
+        catch (err) {
+            console.error("Couldn't save uploaded tileset:", err);
+        }
         this.available_tilesets[tileset_ident] = tilesetdef;
 
         this.custom_tileset_counter += 1;
         this._add_tileset_row(tileset_ident, tilesetdef);
+        this._populate_active_skin_select();
     }
 
     update_selected_tileset(slot_ident) {
@@ -3534,6 +4172,8 @@ class OptionsOverlay extends DialogOverlay {
         let options = this.conductor.options;
         options.touch_mode = this.root.elements['touch-mode'].value;
         options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
+        options.game_speed = parseFloat(this.root.elements['game-speed'].value);
+        options.effects_enabled = this.root.elements['effects-enabled'].checked;
         options.music_volume = parseFloat(this.root.elements['music-volume'].value);
         options.music_enabled = this.root.elements['music-enabled'].checked;
         options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
@@ -3541,59 +4181,33 @@ class OptionsOverlay extends DialogOverlay {
         options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
         options.show_captions = this.root.elements['show-captions'].checked;
 
-        // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data URIs,
-        // and /delete/ any custom ones we're not using any more, both of which require knowing
-        // which slots we're already using first
-        let buckets_in_use = new Set;
-        let chosen_tilesets = {};
+        // Tilesets: assign the per-format slot selections.  User tilesets are persisted
+        // independently (on create / edit / duplicate) and managed with explicit Delete, so
+        // Save no longer garbage-collects anything — it just records which set each slot uses.
         for (let slot of TILESET_SLOTS) {
-            let tileset_ident = this.root.elements[`tileset-${slot.ident}`].value;
-            let tilesetdef = this.available_tilesets[tileset_ident];
-            if (! tilesetdef) {
-                tilesetdef = this.available_tilesets['lexy'];
-            }
+            let ident = this.root.elements[`tileset-${slot.ident}`].value;
+            let def = this.available_tilesets[ident] || this.available_tilesets['lexy'];
+            ident = def.ident;
 
-            chosen_tilesets[slot.ident] = tilesetdef;
-            if (tilesetdef.is_already_stored) {
-                buckets_in_use.add(tilesetdef.ident);
-            }
-        }
-        // Clear out _loaded_tilesets first so it no longer refers to any custom tilesets we end
-        // up deleting
-        this.conductor._loaded_tilesets = {};
-        for (let [slot_ident, tilesetdef] of Object.entries(chosen_tilesets)) {
-            if (tilesetdef.is_builtin || tilesetdef.is_already_stored) {
-                options.tilesets[slot_ident] = tilesetdef.ident;
-            }
-            else {
-                // This is a newly uploaded one
-                let data_uri = tilesetdef.data_uri ?? tilesetdef.canvas.toDataURL('image/png');
-                let storage_bucket = CUSTOM_TILESET_BUCKETS.find(
-                    bucket => ! buckets_in_use.has(bucket));
-                if (! storage_bucket) {
-                    console.error("Somehow ran out of storage buckets, this should be impossible??");
-                    continue;
+            if (! (def.is_builtin || def.is_already_stored)) {
+                // A freshly-uploaded tileset that hasn't been written yet — store it now.
+                try {
+                    save_json_to_storage(CUSTOM_TILESET_PREFIX + ident, {
+                        ident, name: def.name || ident, layout: def.layout,
+                        tile_width: def.tile_width, tile_height: def.tile_height,
+                        src: def.data_uri ?? def.canvas.toDataURL('image/png'),
+                    });
+                    def.is_already_stored = true;
                 }
-                buckets_in_use.add(storage_bucket);
-                save_json_to_storage(CUSTOM_TILESET_PREFIX + storage_bucket, {
-                    src: data_uri,
-                    name: storage_bucket,
-                    layout: tilesetdef.layout,
-                    tile_width: tilesetdef.tile_width,
-                    tile_height: tilesetdef.tile_height,
-                });
-                options.tilesets[slot_ident] = storage_bucket;
+                catch (err) {
+                    console.error("Couldn't save uploaded tileset:", err);
+                    window.alert("Couldn't save a tileset — browser storage may be full.");
+                }
             }
 
-            // Update the conductor's loaded tilesets
-            this.conductor.tilesets[slot_ident] = tilesetdef.tileset;
-            this.conductor._loaded_tilesets[options.tilesets[slot_ident]] = tilesetdef.tileset;
-        }
-        // Delete old custom set URIs
-        for (let bucket of CUSTOM_TILESET_BUCKETS) {
-            if (! buckets_in_use.has(bucket)) {
-                window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + bucket);
-            }
+            options.tilesets[slot.ident] = ident;
+            this.conductor.tilesets[slot.ident] = def.tileset;
+            this.conductor._loaded_tilesets[ident] = def.tileset;
         }
 
         this.conductor.save_stash();
@@ -3609,6 +4223,858 @@ class OptionsOverlay extends DialogOverlay {
         super.close();
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// In-app pixel editor — paint any cell of the tileset and apply it live.
+
+// Walk a tileset layout into a numbered, labelled list of every cell. The label
+// is the path to the cell (state / direction / frame), e.g. "moving · west · #3".
+function compute_cell_labels(tileset) {
+    let img = tileset.image;
+    let cols = Math.round((img.naturalWidth || img.width) / tileset.size_x);
+    let rows = Math.round((img.naturalHeight || img.height) / tileset.size_y);
+    const SKIP = new Set(['__special__', 'modes', 'is_wired_optional', 'duration',
+        'cc2_duration', 'positionally_hashed', 'scroll_region', '_distinct', 'global']);
+    const WRAP = new Set(['all', 'normal']);
+    let claimed = {};
+    let walk = (tile, node, path) => {
+        if (Array.isArray(node)) {
+            if (node.length === 2 && Number.isInteger(node[0]) && Number.isInteger(node[1])
+                && node[0] < cols && node[1] < rows)
+            {
+                let key = node[0] + ',' + node[1];
+                if (! (key in claimed)) claimed[key] = { tile, label: path.join(' · ') };
+                return;
+            }
+            node.forEach((e, i) => walk(tile, e, path.concat('#' + (i + 1))));
+            return;
+        }
+        if (node && typeof node === 'object') {
+            for (let [k, v] of Object.entries(node)) {
+                if (k[0] === '#' || SKIP.has(k)) continue;
+                walk(tile, v, WRAP.has(k) ? path : path.concat(k));
+            }
+        }
+    };
+    for (let [name, v] of Object.entries(tileset.layout)) {
+        if (name[0] !== '#') walk(name, v, []);
+    }
+    let cells = Object.entries(claimed).map(([k, info]) => {
+        let [c, r] = k.split(',').map(Number);
+        return { c, r, tile: info.tile, label: info.label };
+    });
+    cells.sort((a, b) => a.r - b.r || a.c - b.c);
+    cells.forEach((cell, i) => cell.n = i + 1);
+    return cells;
+}
+
+// Default working palette (48 = 6 rows of 8). The editor shows three more rows on top
+// for recently-used colours, tripling the visible swatches from the old 24.
+const EDITOR_PALETTE = [
+    // grayscale ramp
+    '#000000', '#1c1c1c', '#3a3a3a', '#585858', '#7a7a7a', '#9c9c9c', '#c8c8c8', '#ffffff',
+    // warm woods / browns
+    '#2a1c12', '#3a2c20', '#5a4030', '#6b5340', '#8a6a48', '#a9805a', '#c8a06a', '#e6c98c',
+    // gold / skin / parchment
+    '#7a5a2a', '#a97e3a', '#caa25a', '#e8c46a', '#f4e2a6', '#f6d3a0', '#e8b58a', '#c98a5a',
+    // greens
+    '#1e3320', '#2f5a2f', '#4a8a3a', '#6aa84a', '#7a8a4a', '#9cc45a', '#4a8a5a', '#a6e3c0',
+    // blues / cyans
+    '#16283a', '#22405a', '#3a6d8c', '#5f9cc4', '#8fd0e8', '#3a5a8c', '#5a7ac4', '#aacbe8',
+    // reds / oranges / purples / pinks
+    '#5a1e1e', '#8a2e2e', '#c0392b', '#e07a3c', '#a86848', '#9a6db0', '#c47ab0', '#d4a2c4',
+];
+const EDITOR_PALETTE_COLS = 8;
+const EDITOR_RECENT_ROWS = 3;
+const EDITOR_RECENT_CAP = EDITOR_PALETTE_COLS * EDITOR_RECENT_ROWS;  // 24
+const EDITOR_RECENT_KEY = "Lexy's Labyrinth editor recent colors";
+
+class TileEditorOverlay extends DialogOverlay {
+    constructor(conductor, sources, initial_ident, options_overlay = null) {
+        super(conductor);
+        this.root.classList.add('dialog-tile-editor');
+        this.set_title("Tile editor");
+
+        // The Options dialog that launched us, so Apply can register the edited set as a
+        // table row + selection (otherwise Options' Save would clobber it back to Lexy).
+        this.options_overlay = options_overlay;
+        // Tilesets available to paint on (ident -> {name, tileset, …}); switchable in the UI.
+        this.sources = sources;
+        this.source_ident = (sources && sources[initial_ident]) ? initial_ident
+            : (sources && sources['lexy'] ? 'lexy' : Object.keys(sources || {})[0]);
+
+        this.cell_index = 0;
+        this.zoom = 13;
+        this.color = '#caa25a';
+        this.tool = 'pencil';
+        this._clip = null;      // copied cell ImageData
+        this.onion = false;
+        this.reference = null;  // a comparison Tileset (read-only)
+        this.comparing = false; // showing the reference in the main canvas
+        this.ghost_alpha = 0.5; // opacity of the reference ghost overlay
+        this._drag = null;      // {x0,y0,x1,y1} while dragging a line/rect
+        this._dirty = false;    // unapplied edits to the current source?
+        this.palette = EDITOR_PALETTE.slice();   // working palette (per-tileset)
+        this.recent = load_json_from_storage(EDITOR_RECENT_KEY) || [];  // MRU used colours
+
+        this._build_sheet_from(this.sources[this.source_ident].tileset);
+        this._load_palette_for_source();
+
+        this._build_ui();
+        this._load_cell(0);
+
+        this.add_button("apply", () => this._apply());
+        this.add_button("done", () => { this._apply(); this.close(); });
+        this.add_button("cancel", () => this.close());
+
+        // Hold "\" to peek at the reference set.
+        this._keydown = ev => {
+            if (ev.key === '\\' && this.reference) { this._set_compare(true); ev.preventDefault(); }
+        };
+        this._keyup = ev => { if (ev.key === '\\') this._set_compare(false); };
+        this.root.addEventListener('keydown', this._keydown);
+        this.root.addEventListener('keyup', this._keyup);
+    }
+
+    // (Re)build the mutable working sheet from a source tileset. A live Tileset shares
+    // this canvas, so painting on it + a redraw shows in-game after Apply.
+    _build_sheet_from(tileset) {
+        this.source_tileset = tileset;
+        this.layout = tileset.layout;
+        this.TS = tileset.size_x;
+        let img = tileset.image;
+        this.cols = Math.round((img.naturalWidth || img.width) / this.TS);
+        this.rows = Math.round((img.naturalHeight || img.height) / this.TS);
+        this.sheet = mk('canvas', {width: this.cols * this.TS, height: this.rows * this.TS});
+        this.sctx = this.sheet.getContext('2d');
+        this.sctx.drawImage(img, 0, 0);
+        this.work_tileset = new Tileset(this.sheet, this.layout, this.TS, this.TS);
+        this.cells = compute_cell_labels(tileset);
+        this._undo = [];
+    }
+
+    _switch_source(ident) {
+        if (! this.sources[ident] || ident === this.source_ident) return;
+        if (this._dirty && ! window.confirm(
+                "Switch which tileset you're editing? Changes you haven't applied will be lost.")) {
+            this.source_select.value = this.source_ident;  // revert the dropdown
+            return;
+        }
+        this.source_ident = ident;
+        this._build_sheet_from(this.sources[ident].tileset);
+        this._load_palette_for_source();
+        this._render_palette();
+        this._dirty = false;
+        // Resize the edit canvas if this source has a different tile size.
+        let CV = this.TS * this.zoom;
+        if (this.edit_canvas.width !== CV) { this.edit_canvas.width = CV; this.edit_canvas.height = CV; }
+        // Refresh the reference tileset to match the new layout/size, then redraw all views.
+        if (this.reference && (this.reference.layout !== this.layout || this.reference.size_x !== this.TS)) {
+            this.reference = new Tileset(this.reference.image, this.layout, this.TS, this.TS);
+        }
+        if (this.cell_index >= this.cells.length) this.cell_index = 0;
+        this._load_cell(this.cell_index);
+        this.minimap.width = this.cols * this.map_scale;
+        this.minimap.height = this.rows * this.map_scale;
+        this._refresh_minimap();
+    }
+
+    _build_ui() {
+        let CV = this.TS * this.zoom;
+
+        // -- tools --
+        this.tool_buttons = {};
+        let tool_row = mk('div.-tools');
+        let tool_defs = [
+            ['pencil', '✏', 'pencil'], ['eraser', '▨', 'eraser'],
+            ['line', '╱', 'line'], ['rect', '▭', 'rect'], ['fill', '🪣', 'fill'],
+            ['eyedropper', '⦿', 'eyedropper'],
+            ['ghost', '👻', 'ghost brush — trace pixels down from the reference'],
+        ];
+        for (let [id, label, title] of tool_defs) {
+            let b = mk('button', {type: 'button', title}, label);
+            b.addEventListener('click', () => this._set_tool(id));
+            this.tool_buttons[id] = b;
+            tool_row.append(b);
+        }
+        // -- actions --
+        let copy_b = mk('button', {type: 'button'}, "copy");
+        copy_b.addEventListener('click', () => this._copy());
+        this.paste_b = mk('button', {type: 'button', disabled: true}, "paste");
+        this.paste_b.addEventListener('click', () => this._paste());
+        let undo_b = mk('button', {type: 'button'}, "↶ undo");
+        undo_b.addEventListener('click', () => this._undo_pop());
+        // -- reflect --
+        let flip_h_b = mk('button', {type: 'button', title: 'flip horizontally'}, "⇆ flip");
+        flip_h_b.addEventListener('click', () => this._flip('h'));
+        let flip_v_b = mk('button', {type: 'button', title: 'flip vertically'}, "⇅ flip");
+        flip_v_b.addEventListener('click', () => this._flip('v'));
+        // -- onion --
+        this.onion_cb = mk('input', {type: 'checkbox'});
+        this.onion_cb.addEventListener('change', () => { this.onion = this.onion_cb.checked; this._redraw_edit(); });
+
+        // -- palette: recently-used rows on top, working palette below, + a setup menu --
+        this.recent_grid = mk('div.-palette.-recent');
+        this.palette_grid = mk('div.-palette');
+        let fill_b = mk('button.-pal-setup-btn', {type: 'button',
+            title: 'Fill the palette with the most-used colours in this tileset'}, "⛏ From tileset");
+        fill_b.addEventListener('click', () => this._fill_palette_from_tileset());
+        let reset_b = mk('button.-pal-setup-btn', {type: 'button',
+            title: 'Reset the palette to the defaults'}, "↺ Reset");
+        reset_b.addEventListener('click', () => this._reset_palette());
+        let palette_box = mk('div.-palette-box',
+            mk('div.-pal-label', "Recent"),
+            this.recent_grid,
+            mk('div.-pal-label', "Palette"),
+            this.palette_grid,
+            mk('div.-pal-setup', fill_b, reset_b),
+        );
+        this.color_input = mk('input', {type: 'color', value: this.color});
+        this.color_input.addEventListener('input', ev => this._set_color(ev.target.value, false));
+
+        // -- main canvas --
+        this.edit_canvas = mk('canvas.-edit', {width: CV, height: CV});
+        this.ectx = this.edit_canvas.getContext('2d');
+        this.ectx.imageSmoothingEnabled = false;
+        this._bind_canvas();
+
+        // -- which tileset are we painting on? --
+        this.source_select = mk('select.-source-select');
+        for (let [ident, def] of Object.entries(this.sources)) {
+            this.source_select.append(mk('option', {value: ident}, def.name || ident));
+        }
+        this.source_select.value = this.source_ident;
+        this.source_select.addEventListener('change', () => this._switch_source(this.source_select.value));
+
+        // -- nav + filmstrip --
+        this.cell_label_el = mk('div.-cell-label');
+        let prev = mk('button', {type: 'button'}, "‹");
+        prev.addEventListener('click', () => this._load_cell(this.cell_index - 1));
+        let next = mk('button', {type: 'button'}, "›");
+        next.addEventListener('click', () => this._load_cell(this.cell_index + 1));
+        this.search = mk('input.-cell-search', {type: 'search', placeholder: "find a cell… e.g. player west, key red"});
+        this.search.addEventListener('change', () => this._search());
+        this.strip_el = mk('div.-filmstrip');
+
+        // -- reference / compare --
+        this.ref_select = mk('select.-ref-select',
+            mk('option', {value: 'none'}, "no reference"),
+            mk('option', {value: 'lexy'}, "Lexy (original)"),
+            mk('option', {value: 'upload'}, "load a PNG…"));
+        this.ref_select.addEventListener('change', () => this._set_reference(this.ref_select.value));
+        this.ref_file = mk('input', {type: 'file', accept: 'image/*', style: 'display:none'});
+        this.ref_file.addEventListener('change', ev => this._load_reference_file(ev.target.files[0]));
+        this.ref_thumb = mk('canvas.-ref-thumb', {width: this.TS * 4, height: this.TS * 4});
+        this.compare_b = mk('button', {type: 'button', disabled: true}, "◑ compare");
+        this.compare_b.addEventListener('click', () => this._set_compare(! this.comparing));
+        this.ghost_slider = mk('input.-ghost-slider', {
+            type: 'range', min: 10, max: 90, value: Math.round(this.ghost_alpha * 100), disabled: true});
+        this.ghost_slider.addEventListener('input', () => {
+            this.ghost_alpha = this.ghost_slider.value / 100;
+            if (this.comparing) this._redraw_edit();
+        });
+
+        // -- whole-tileset board (click a cell to edit) --
+        this.map_scale = 12;
+        this.minimap = mk('canvas.-minimap', {width: this.cols * this.map_scale, height: this.rows * this.map_scale});
+        this.board_label = mk('div.-board-label');
+        this._hover = null;
+        this.minimap.addEventListener('pointerdown', ev => this._minimap_click(ev));
+        this.minimap.addEventListener('pointermove', ev => this._minimap_hover(ev));
+        this.minimap.addEventListener('pointerleave', () => { this._hover = null; this._refresh_minimap(); this.board_label.textContent = ''; });
+
+        this.main.append(
+            mk('p.-editor-intro', "Paint a cell, then ", mk('b', "apply"), " to see it in the game. Cell numbers match the legend."),
+            mk('div.-editor',
+                mk('div.-left',
+                    tool_row,
+                    mk('div.-actions', copy_b, this.paste_b, undo_b),
+                    mk('div.-actions', flip_h_b, flip_v_b),
+                    palette_box,
+                    mk('label.-custom-color', "custom ", this.color_input),
+                    mk('label.-onion', this.onion_cb, " onion skin"),
+                ),
+                mk('div.-center',
+                    mk('label.-source', "Editing: ", this.source_select),
+                    mk('div.-nav', prev, this.cell_label_el, next),
+                    this.edit_canvas,
+                    this.strip_el,
+                    this.search,
+                ),
+                mk('div.-right',
+                    mk('h3', "Compare"),
+                    this.ref_select, this.ref_file,
+                    this.ref_thumb,
+                    this.compare_b,
+                    mk('label.-ghost-opacity', "ghost", this.ghost_slider),
+                    mk('p.-hint', "hold \\ to peek"),
+                ),
+            ),
+            mk('div.-board',
+                mk('h3', "Whole tileset — click a cell to edit"),
+                this.minimap,
+                this.board_label,
+            ),
+        );
+        this._set_tool('pencil');
+        this._set_color(this.color);
+        this._render_palette();
+        this._refresh_minimap();
+    }
+
+    _set_tool(id) {
+        if (id === 'ghost' && ! this.reference) {
+            window.alert("The ghost brush traces from a reference. Pick one under Compare first " +
+                "(e.g. \"Lexy (original)\" or load a PNG).");
+            return;
+        }
+        this.tool = id;
+        for (let [k, b] of Object.entries(this.tool_buttons)) b.classList.toggle('--pressed', k === id);
+    }
+    _set_color(c, update_input = true) {
+        this.color = c;
+        if (update_input && this.color_input) this.color_input.value = c;
+        this._sync_palette_selection();
+    }
+
+    // ---- palette -----------------------------------------------------------
+    _render_palette() {
+        if (! this.palette_grid) return;
+        // Recent (top rows): MRU colours, padded to a full grid with empty slots.
+        this.recent_grid.textContent = '';
+        for (let i = 0; i < EDITOR_RECENT_CAP; i++) {
+            let c = this.recent[i];
+            if (c) {
+                let sw = mk('button.-swatch', {type: 'button', title: c + " (recent)"});
+                sw.style.background = c;
+                sw.addEventListener('click', () => this._set_color(c));
+                this.recent_grid.append(sw);
+            }
+            else {
+                this.recent_grid.append(mk('div.-swatch.-empty'));
+            }
+        }
+        // Working palette.
+        this.palette_grid.textContent = '';
+        for (let c of this.palette) {
+            let sw = mk('button.-swatch', {type: 'button', title: c});
+            sw.style.background = c;
+            sw.addEventListener('click', () => this._set_color(c));
+            this.palette_grid.append(sw);
+        }
+        this._sync_palette_selection();
+    }
+
+    _sync_palette_selection() {
+        if (! this.palette_grid) return;
+        let cur = (this.color || '').toLowerCase();
+        for (let sw of [...this.recent_grid.children, ...this.palette_grid.children]) {
+            if (! sw.classList) continue;
+            let bg = (sw.title || '').split(' ')[0].toLowerCase();
+            sw.classList.toggle('--current', !!bg && bg === cur);
+        }
+    }
+
+    // Record a colour as recently-used (MRU, deduped, capped) and persist globally.
+    _note_recent(c) {
+        if (! c) return;
+        c = c.toLowerCase();
+        let i = this.recent.findIndex(x => x.toLowerCase() === c);
+        if (i === 0) return;                 // already most-recent, nothing to do
+        if (i > 0) this.recent.splice(i, 1);
+        this.recent.unshift(c);
+        if (this.recent.length > EDITOR_RECENT_CAP) this.recent.length = EDITOR_RECENT_CAP;
+        try { save_json_to_storage(EDITOR_RECENT_KEY, this.recent); } catch (e) {}
+        this._render_palette();
+    }
+
+    // Load the working palette for the current source (per-tileset, if it has one saved).
+    _load_palette_for_source() {
+        let def = this.sources[this.source_ident];
+        let rec = (def && def.is_user) ? load_json_from_storage(CUSTOM_TILESET_PREFIX + this.source_ident) : null;
+        this.palette = (rec && Array.isArray(rec.palette) && rec.palette.length)
+            ? rec.palette.slice() : EDITOR_PALETTE.slice();
+    }
+
+    // Persist the working palette onto the current tileset's stored record (user sets only).
+    _save_palette() {
+        let def = this.sources[this.source_ident];
+        if (! def || ! def.is_user) return;
+        let rec = load_json_from_storage(CUSTOM_TILESET_PREFIX + this.source_ident);
+        if (! rec) return;
+        rec.palette = this.palette;
+        try { save_json_to_storage(CUSTOM_TILESET_PREFIX + this.source_ident, rec); }
+        catch (err) { console.error("Couldn't save palette:", err); }
+    }
+
+    // Setup menu: fill the palette with the most-used colours in this tileset.
+    _fill_palette_from_tileset() {
+        let d = this.sctx.getImageData(0, 0, this.sheet.width, this.sheet.height).data;
+        let counts = new Map();
+        for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] < 8) continue;      // skip (near-)transparent
+            let hex = '#' + [d[i], d[i + 1], d[i + 2]]
+                .map(v => v.toString(16).padStart(2, '0')).join('');
+            counts.set(hex, (counts.get(hex) || 0) + 1);
+        }
+        let top = [...counts.entries()].sort((a, b) => b[1] - a[1])
+            .slice(0, EDITOR_PALETTE.length).map(e => e[0]);
+        if (! top.length) return;
+        this.palette = top;
+        this._render_palette();
+        this._save_palette();
+        if (! (this.sources[this.source_ident] || {}).is_user) {
+            window.alert("Filled the palette from this tileset. (It's a built-in, so the palette " +
+                "resets when you reopen — duplicate it first to keep a custom palette.)");
+        }
+    }
+
+    _reset_palette() {
+        this.palette = EDITOR_PALETTE.slice();
+        this._render_palette();
+        this._save_palette();
+    }
+
+    _tile_frames() { return this.cells.filter(c => c.tile === this.cell.tile); }
+
+    _load_cell(idx) {
+        if (this.cells.length === 0) return;
+        this.cell_index = (idx + this.cells.length) % this.cells.length;
+        this.cell = this.cells[this.cell_index];
+        this._undo = [];
+        this.cell_label_el.textContent =
+            `#${this.cell.n} · ${this.cell.tile}${this.cell.label ? ' · ' + this.cell.label : ''} (${this.cell.c},${this.cell.r})`;
+        this._redraw_edit();
+        this._refresh_filmstrip();
+        this._refresh_reference();
+        this._refresh_minimap();
+    }
+
+    _search() {
+        let q = this.search.value.trim().toLowerCase();
+        if (! q) return;
+        let terms = q.split(/\s+/);
+        let hit = this.cells.findIndex(c =>
+            terms.every(t => (c.tile + ' ' + c.label + ' #' + c.n).toLowerCase().includes(t)));
+        if (hit >= 0) this._load_cell(hit);
+    }
+
+    // draw one cell of some image into a target ctx scaled to fill
+    _blit_cell(ctx, image, c, r, dw, dh) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(image, c * this.TS, r * this.TS, this.TS, this.TS, 0, 0, dw, dh);
+    }
+
+    _redraw_edit() {
+        let CV = this.edit_canvas.width, TS = this.TS, s = this.zoom, ctx = this.ectx, cell = this.cell;
+        ctx.clearRect(0, 0, CV, CV);
+        for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            ctx.fillStyle = ((x + y) & 1) ? '#d7ccb8' : '#c4b79e';
+            ctx.fillRect(x * s, y * s, s, s);
+        }
+        ctx.imageSmoothingEnabled = false;
+
+        // onion skin: ghost the neighbouring frames of this tile
+        if (this.onion) {
+            let frames = this._tile_frames();
+            let idx = frames.findIndex(f => f.c === cell.c && f.r === cell.r);
+            ctx.globalAlpha = 0.28;
+            for (let n of [frames[idx - 1], frames[idx + 1]]) {
+                if (n) this._blit_cell(ctx, this.sheet, n.c, n.r, CV, CV);
+            }
+            ctx.globalAlpha = 1;
+        }
+        // your edit
+        this._blit_cell(ctx, this.sheet, cell.c, cell.r, CV, CV);
+        // preview a line/rect while dragging
+        if (this._drag) {
+            ctx.fillStyle = this.tool === 'eraser' ? 'rgba(220,60,60,0.6)' : this.color;
+            for (let [x, y] of this._shape_points(this._drag)) ctx.fillRect(x * s, y * s, s, s);
+        }
+        // reference ghost overlaid on top, for tracing
+        if (this.comparing && this.reference) {
+            ctx.globalAlpha = this.ghost_alpha;
+            this._blit_cell(ctx, this.reference.image, cell.c, cell.r, CV, CV);
+            ctx.globalAlpha = 1;
+        }
+
+        ctx.strokeStyle = 'rgba(0,0,0,0.14)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= TS; i++) {
+            ctx.beginPath(); ctx.moveTo(i*s + 0.5, 0); ctx.lineTo(i*s + 0.5, CV); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i*s + 0.5); ctx.lineTo(CV, i*s + 0.5); ctx.stroke();
+        }
+    }
+
+    _refresh_filmstrip() {
+        this.strip_el.textContent = '';
+        let frames = this._tile_frames();
+        if (frames.length <= 1) return;
+        for (let f of frames) {
+            let c = mk('canvas.-frame', {width: this.TS * 2, height: this.TS * 2});
+            this._blit_cell(c.getContext('2d'), this.sheet, f.c, f.r, this.TS * 2, this.TS * 2);
+            if (f === this.cell) c.classList.add('--current');
+            c.title = f.label || f.tile;
+            c.addEventListener('click', () => this._load_cell(this.cells.indexOf(f)));
+            this.strip_el.append(c);
+        }
+    }
+
+    _refresh_reference() {
+        let ctx = this.ref_thumb.getContext('2d');
+        ctx.clearRect(0, 0, this.ref_thumb.width, this.ref_thumb.height);
+        if (this.reference) {
+            this._blit_cell(ctx, this.reference.image, this.cell.c, this.cell.r, this.ref_thumb.width, this.ref_thumb.height);
+        }
+    }
+
+    _refresh_minimap() {
+        let ctx = this.minimap.getContext('2d'), ms = this.map_scale;
+        ctx.imageSmoothingEnabled = false;
+        ctx.fillStyle = '#e9e0cf';
+        ctx.fillRect(0, 0, this.minimap.width, this.minimap.height);
+        ctx.drawImage(this.sheet, 0, 0, this.minimap.width, this.minimap.height);
+        if (this._hover) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this._hover.c * ms + 1, this._hover.r * ms + 1, ms - 2, ms - 2);
+        }
+        if (this.cell) {
+            ctx.strokeStyle = '#c0392b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.cell.c * ms + 1, this.cell.r * ms + 1, ms - 2, ms - 2);
+        }
+    }
+
+    _minimap_cell(ev) {
+        let r = this.minimap.getBoundingClientRect();
+        return [
+            Math.floor((ev.clientX - r.x) / (r.width / this.cols)),
+            Math.floor((ev.clientY - r.y) / (r.height / this.rows)),
+        ];
+    }
+    _minimap_click(ev) {
+        let [col, row] = this._minimap_cell(ev);
+        let hit = this.cells.findIndex(c => c.c === col && c.r === row);
+        if (hit >= 0) this._load_cell(hit);
+    }
+    _minimap_hover(ev) {
+        let [col, row] = this._minimap_cell(ev);
+        this._hover = { c: col, r: row };
+        this._refresh_minimap();
+        let cell = this.cells.find(c => c.c === col && c.r === row);
+        this.board_label.textContent = cell
+            ? `#${cell.n} · ${cell.tile}${cell.label ? ' · ' + cell.label : ''}`
+            : `(${col}, ${row}) — empty`;
+    }
+
+    _bind_canvas() {
+        let painting = false;
+        let to_px = ev => {
+            // Map to the canvas *content* box: getBoundingClientRect is the border box, so
+            // subtract the border (clientLeft/Top) and divide by the content size
+            // (clientWidth/Height) — otherwise the 2px border skews every click by ~1px.
+            let cv = this.edit_canvas;
+            let r = cv.getBoundingClientRect();
+            let x = Math.floor((ev.clientX - r.left - cv.clientLeft) / cv.clientWidth * this.TS);
+            let y = Math.floor((ev.clientY - r.top - cv.clientTop) / cv.clientHeight * this.TS);
+            return [Math.max(0, Math.min(this.TS - 1, x)), Math.max(0, Math.min(this.TS - 1, y))];
+        };
+        this.edit_canvas.addEventListener('pointerdown', ev => {
+            ev.preventDefault();
+            let [px, py] = to_px(ev);
+            if (this.tool === 'eyedropper') { this._pick(px, py); return; }
+            if (this.tool !== 'eraser' && this.tool !== 'ghost') this._note_recent(this.color);
+            if (this.tool === 'line' || this.tool === 'rect') {
+                this._push_undo();
+                this._drag = {x0: px, y0: py, x1: px, y1: py};
+                this._redraw_edit();
+                return;
+            }
+            this._push_undo();
+            if (this.tool === 'fill') { this._flood(px, py); }
+            else { painting = true; this._paint(px, py); }
+        });
+        this.edit_canvas.addEventListener('pointermove', ev => {
+            let [px, py] = to_px(ev);
+            if (this._drag) { this._drag.x1 = px; this._drag.y1 = py; this._redraw_edit(); }
+            else if (painting) { this._paint(px, py); }
+        });
+        window.addEventListener('pointerup', () => {
+            if (this._drag) {
+                for (let [x, y] of this._shape_points(this._drag)) this._set_pixel(x, y);
+                this._drag = null;
+                this._redraw_edit();
+                this._refresh_filmstrip();
+                this._refresh_minimap();
+            }
+            if (painting) { painting = false; this._refresh_filmstrip(); this._refresh_minimap(); }
+        });
+    }
+
+    _sheet_xy(px, py) { return [this.cell.c * this.TS + px, this.cell.r * this.TS + py]; }
+
+    _set_pixel(px, py) {
+        let [gx, gy] = this._sheet_xy(px, py);
+        if (this.tool === 'ghost') {
+            // Stamp the matching pixel from the reference ("ghost") tileset onto the sheet.
+            let rd = this._ref_cell_data();
+            if (! rd) return;
+            let i = (py * this.TS + px) * 4;
+            let a = rd.data[i + 3];
+            this.sctx.clearRect(gx, gy, 1, 1);
+            if (a > 0) {
+                this.sctx.fillStyle = `rgba(${rd.data[i]},${rd.data[i + 1]},${rd.data[i + 2]},${a / 255})`;
+                this.sctx.fillRect(gx, gy, 1, 1);
+            }
+            return;
+        }
+        this.sctx.clearRect(gx, gy, 1, 1);
+        if (this.tool !== 'eraser') {
+            this.sctx.fillStyle = this.color;
+            this.sctx.fillRect(gx, gy, 1, 1);
+        }
+    }
+    _paint(px, py) { this._set_pixel(px, py); this._redraw_edit(); }
+
+    // ImageData of the reference tileset's current cell (TS×TS), cached per cell/reference.
+    _ref_cell_data() {
+        if (! this.reference) return null;
+        let key = `${this.cell.c},${this.cell.r}`;
+        if (this._ref_cache && this._ref_cache.ref === this.reference && this._ref_cache.key === key) {
+            return this._ref_cache.data;
+        }
+        let TS = this.TS;
+        let cv = mk('canvas', {width: TS, height: TS});
+        let cx = cv.getContext('2d');
+        cx.imageSmoothingEnabled = false;
+        cx.drawImage(this.reference.image, this.cell.c * TS, this.cell.r * TS, TS, TS, 0, 0, TS, TS);
+        let data = cx.getImageData(0, 0, TS, TS);
+        this._ref_cache = {ref: this.reference, key, data};
+        return data;
+    }
+
+    // Bresenham line / rectangle outline points within the cell
+    _shape_points(d) {
+        let pts = [];
+        if (this.tool === 'rect') {
+            let x0 = Math.min(d.x0, d.x1), x1 = Math.max(d.x0, d.x1);
+            let y0 = Math.min(d.y0, d.y1), y1 = Math.max(d.y0, d.y1);
+            for (let x = x0; x <= x1; x++) { pts.push([x, y0], [x, y1]); }
+            for (let y = y0; y <= y1; y++) { pts.push([x0, y], [x1, y]); }
+            return pts;
+        }
+        // line
+        let x0 = d.x0, y0 = d.y0, x1 = d.x1, y1 = d.y1;
+        let dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+        let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+        while (true) {
+            pts.push([x0, y0]);
+            if (x0 === x1 && y0 === y1) break;
+            let e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+        return pts;
+    }
+
+    _pick(px, py) {
+        let [gx, gy] = this._sheet_xy(px, py);
+        let d = this.sctx.getImageData(gx, gy, 1, 1).data;
+        if (d[3] === 0) return;
+        this._set_color('#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join(''));
+        this._set_tool('pencil');
+    }
+
+    _flood(px, py) {
+        let TS = this.TS, [ox, oy] = this._sheet_xy(0, 0);
+        let region = this.sctx.getImageData(ox, oy, TS, TS), d = region.data;
+        let at = (x, y) => (y * TS + x) * 4;
+        let i0 = at(px, py);
+        let target = [d[i0], d[i0+1], d[i0+2], d[i0+3]];
+        let hex = this.color.replace('#', '');
+        let fill = this.tool === 'eraser' ? [0, 0, 0, 0]
+            : [parseInt(hex.slice(0,2), 16), parseInt(hex.slice(2,4), 16), parseInt(hex.slice(4,6), 16), 255];
+        let same = (i, c) => d[i]===c[0] && d[i+1]===c[1] && d[i+2]===c[2] && d[i+3]===c[3];
+        if (same(i0, fill)) return;
+        let stack = [[px, py]];
+        while (stack.length) {
+            let [x, y] = stack.pop();
+            if (x < 0 || y < 0 || x >= TS || y >= TS) continue;
+            let i = at(x, y);
+            if (! same(i, target)) continue;
+            d[i] = fill[0]; d[i+1] = fill[1]; d[i+2] = fill[2]; d[i+3] = fill[3];
+            stack.push([x+1, y], [x-1, y], [x, y+1], [x, y-1]);
+        }
+        this.sctx.putImageData(region, ox, oy);
+        this._redraw_edit();
+        this._refresh_minimap();
+    }
+
+    _copy() {
+        this._clip = this.sctx.getImageData(this.cell.c * this.TS, this.cell.r * this.TS, this.TS, this.TS);
+        this.paste_b.disabled = false;
+    }
+    _paste() {
+        if (! this._clip) return;
+        this._push_undo();
+        this.sctx.putImageData(this._clip, this.cell.c * this.TS, this.cell.r * this.TS);
+        this._redraw_edit();
+        this._refresh_filmstrip();
+        this._refresh_minimap();
+    }
+
+    _set_reference(kind) {
+        if (kind === 'none') { this.reference = null; this._set_compare(false); this.compare_b.disabled = true; this._refresh_reference(); return; }
+        if (kind === 'upload') { this.ref_file.click(); return; }
+        if (kind === 'lexy') {
+            let img = mk('img');
+            img.src = 'reference-lexy.png';
+            img.decode().then(() => {
+                this.reference = new Tileset(img, this.layout, this.TS, this.TS);
+                this.compare_b.disabled = false;
+                this._refresh_reference();
+            }).catch(() => {});
+        }
+    }
+    _load_reference_file(file) {
+        if (! file) return;
+        let reader = new FileReader;
+        reader.onload = () => {
+            let img = mk('img');
+            img.src = reader.result;
+            img.decode().then(() => {
+                this.reference = new Tileset(img, this.layout, this.TS, this.TS);
+                this.compare_b.disabled = false;
+                this._refresh_reference();
+            }).catch(() => {});
+        };
+        reader.readAsDataURL(file);
+    }
+    _set_compare(on) {
+        this.comparing = on && !! this.reference;
+        this.compare_b.classList.toggle('--pressed', this.comparing);
+        this.edit_canvas.classList.toggle('-comparing', this.comparing);
+        this.ghost_slider.disabled = ! this.comparing;
+        this._redraw_edit();
+    }
+
+    // Reflect the current cell in place. axis 'h' = mirror left↔right, 'v' = top↔bottom.
+    _flip(axis) {
+        this._push_undo();
+        let TS = this.TS, [ox, oy] = this._sheet_xy(0, 0);
+        let src = this.sctx.getImageData(ox, oy, TS, TS);
+        let dst = this.sctx.createImageData(TS, TS);
+        for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+            let sx = axis === 'h' ? (TS - 1 - x) : x;
+            let sy = axis === 'v' ? (TS - 1 - y) : y;
+            let si = (sy * TS + sx) * 4, di = (y * TS + x) * 4;
+            dst.data[di] = src.data[si];
+            dst.data[di + 1] = src.data[si + 1];
+            dst.data[di + 2] = src.data[si + 2];
+            dst.data[di + 3] = src.data[si + 3];
+        }
+        this.sctx.putImageData(dst, ox, oy);
+        this._redraw_edit();
+        this._refresh_filmstrip();
+        this._refresh_minimap();
+    }
+
+    _push_undo() {
+        let TS = this.TS, [ox, oy] = this._sheet_xy(0, 0);
+        this._undo.push(this.sctx.getImageData(ox, oy, TS, TS));
+        if (this._undo.length > 50) this._undo.shift();
+        this._dirty = true;
+    }
+    _undo_pop() {
+        if (! this._undo.length) return;
+        let [ox, oy] = this._sheet_xy(0, 0);
+        this.sctx.putImageData(this._undo.pop(), ox, oy);
+        this._redraw_edit();
+        this._refresh_filmstrip();
+        this._refresh_minimap();
+    }
+
+    _apply() {
+        // Work out where these edits should be saved.  You can only overwrite a *user*
+        // tileset; editing a read-only built-in saves the result as a new named tileset.
+        let def = this.sources[this.source_ident];
+        let target = this.source_ident;
+        let target_name = (def && def.name) || this.source_ident;
+        if (! def || ! def.is_user) {
+            let base = this._unique_source_name(`${target_name} (edited)`);
+            let name = window.prompt(
+                `"${target_name}" is a built-in tileset and can't be overwritten.\n` +
+                `Save your changes as a new tileset named:`, base);
+            if (name === null) return;
+            name = name.trim();
+            if (! name) return;
+            if (this.sources[name] || BUILTIN_TILESETS[name]) {
+                window.alert(`A tileset named "${name}" already exists — pick a different name.`);
+                return;
+            }
+            target = name;
+            target_name = name;
+        }
+
+        // Make the working tileset active everywhere, live.
+        for (let slot of TILESET_SLOTS) {
+            this.conductor.tilesets[slot.ident] = this.work_tileset;
+        }
+        this.conductor._loaded_tilesets[target] = this.work_tileset;
+        let p = this.conductor.player;
+        if (p && p.renderer) { p.renderer.tileset = this.work_tileset; if (p._redraw) p._redraw(); }
+        if (this.conductor.editor && this.conductor.editor.renderer) {
+            this.conductor.editor.renderer.tileset = this.work_tileset;
+        }
+        // Persist to the target tileset so it survives reload (reuses the load path).
+        try {
+            save_json_to_storage(CUSTOM_TILESET_PREFIX + target, {
+                ident: target, name: target_name,
+                layout: this.layout['#ident'], tile_width: this.TS, tile_height: this.TS,
+                src: this.sheet.toDataURL('image/png'),
+                palette: this.palette,   // keep the tileset's palette alongside its art
+            });
+            for (let slot of TILESET_SLOTS) this.conductor.options.tilesets[slot.ident] = target;
+            this.conductor.save_stash();
+        }
+        catch (err) {
+            console.error("Couldn't save the edited tileset:", err);
+            window.alert("Your edits are showing now, but couldn't be saved for next time " +
+                "(browser storage may be full). They'll be lost on reload.");
+        }
+
+        // Reflect the target as a selected row in the launching Options dialog, so its Save
+        // preserves it rather than reverting every slot.
+        if (this.options_overlay) this.options_overlay._register_user_tileset(target, this.work_tileset, target_name);
+
+        // Keep editing the target tileset: register it as a source (if new) and select it.
+        this.sources[target] = this.sources[target] || { ident: target, name: target_name, is_user: true, is_already_stored: true };
+        this.sources[target].tileset = this.work_tileset;
+        this.sources[target].is_user = true;
+        if (! [...this.source_select.options].some(o => o.value === target)) {
+            this.source_select.append(mk('option', {value: target}, target_name));
+        }
+        this.source_ident = target;
+        this.source_select.value = target;
+        this._dirty = false;
+    }
+
+    _unique_source_name(base) {
+        let taken = name => this.sources[name] || BUILTIN_TILESETS[name];
+        if (! taken(base)) return base;
+        for (let i = 2; ; i++) {
+            let cand = `${base} ${i}`;
+            if (! taken(cand)) return cand;
+        }
+    }
+
+    close() {
+        this.root.removeEventListener('keydown', this._keydown);
+        this.root.removeEventListener('keyup', this._keyup);
+        super.close();
+    }
+}
 class CompatOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
@@ -3618,9 +5084,9 @@ class CompatOverlay extends DialogOverlay {
         this.main.append(
             mk('p',
                 "These are more technical settings, and as such are documented in full on ",
-                mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/wiki/Compatibility'}, "the project wiki"),
+                mk('a', {href: 'https://github.com/BrewerIndustries/jarvis-junction'}, "the project page"),
                 "."),
-            mk('p', "Lexy mode should be fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for."),
+            mk('p', "Jarvis mode should be fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for."),
             mk('p', "Changes take effect when a level starts."),
         );
 
@@ -4594,8 +6060,9 @@ class Conductor {
             this._compat_ruleset = ruleset;
         }
 
-        document.querySelector('#main-compat img').src = `icons/compat-${ruleset}.png`;
-        document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[ruleset];
+        // The mode button no longer shows an icon/label; reflect the current ruleset in its tooltip.
+        let compat_button = document.querySelector('#main-compat');
+        if (compat_button) compat_button.title = `Rules: ${COMPAT_RULESET_LABELS[ruleset]}`;
 
         this.compat = flags;
     }
@@ -4646,22 +6113,23 @@ class Conductor {
 
     // FIXME all this api fucking sucks lol.  a pack definition should probably be a Thing?  how
     // does the canonical ident even come into play here???  does it?????????
-    async fetch_pack(path, title, identifier) {
+    async fetch_pack(path, title, identifier, override_title = false) {
         let solutions;
         if (this.player.debug.enabled) {
-            if (title === "Chip's Challenge Level Pack 1") {
+            // Match by path, not display title, so renamed packs still find solutions.
+            if (path === 'levels/CCLP1.ccl') {
                 let solutions_buf = await util.fetch('levels/public_CCLP1-lynx.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
             }
-            else if (title === "Chip's Challenge Level Pack 2-X") {
+            else if (path === 'levels/CCLXP2.ccl') {
                 let solutions_buf = await util.fetch('levels/public_CCLXP2.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
             }
-            else if (title === "Chip's Challenge Level Pack 3") {
+            else if (path === 'levels/CCLP3.ccl') {
                 let solutions_buf = await util.fetch('levels/public_CCLP3-lynx.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
             }
-            else if (title === "Chip's Challenge Level Pack 4") {
+            else if (path === 'levels/CCLP4.ccl') {
                 let solutions_buf = await util.fetch('levels/public_CCLP4-lynx.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
             }
@@ -4675,7 +6143,7 @@ class Conductor {
         // TODO handle errors
         // TODO cancel a download if we start another one?
         let buf = await util.fetch(path);
-        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, identifier, title);
+        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, identifier, title, override_title);
         if (solutions) {
             this.stored_game.level_replays = solutions.levels;
             // A bit rude, but since parse_and_load_game already switched us to the player, which
@@ -4689,7 +6157,7 @@ class Conductor {
         }
     }
 
-    async parse_and_load_game(buf, source, path, identifier, title) {
+    async parse_and_load_game(buf, source, path, identifier, title, override_title = false) {
         if (! identifier) {
             identifier = this.extract_identifier_from_path(path);
         }
@@ -4717,7 +6185,7 @@ class Conductor {
             // That's the ZIP header
             // FIXME move this here i guess and flesh it out some
             // FIXME if this doesn't find something then we should abort
-            await this.splash.search_multi_source(new util.ZipFileSource(buf));
+            await this.splash.search_multi_source(new util.ZipFileSource(buf), title, override_title);
             return;
         }
         else if (magic.toLowerCase() === 'game') {
@@ -4753,7 +6221,12 @@ class Conductor {
             throw new Error("Unrecognized file format");
         }
 
-        if (! stored_game.title) {
+        // Built-in packs force our display title (override_title); otherwise the
+        // pack file's own embedded title wins, falling back to the passed title.
+        if (override_title && title) {
+            stored_game.title = title;
+        }
+        else if (! stored_game.title) {
             stored_game.title = title ?? identifier ?? "Untitled pack";
         }
 
@@ -4794,7 +6267,7 @@ class Conductor {
             // Built-in pack
             if (BUILTIN_PACKS_BY_IDENT[path]) {
                 let packdef = BUILTIN_PACKS_BY_IDENT[path];
-                await this.fetch_pack(packdef.path, packdef.title, packdef.ident);
+                await this.fetch_pack(packdef.path, packdef.title, packdef.ident, true);
             }
             // GliderBot-hosted path
             else if (path.startsWith('gb:')) {
